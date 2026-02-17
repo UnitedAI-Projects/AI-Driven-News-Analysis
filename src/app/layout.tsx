@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import PageTransition from "@/components/PageTransition";
 
 export const metadata: Metadata = {
   title: "NewSeries — News Bias Analyzer",
@@ -15,9 +17,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col">
+      <body className="min-h-screen flex flex-col relative">
+        <AnimatedBackground />
         <Nav />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 relative">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <Footer />
       </body>
     </html>

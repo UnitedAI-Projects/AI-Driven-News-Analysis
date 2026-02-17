@@ -18,8 +18,8 @@ const sampleAnalyses = [
 export default function ExamplesPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="font-serif text-3xl font-bold text-navy md:text-4xl">Example analyses</h1>
-      <p className="mt-2 text-navy/80">
+      <h1 className="font-serif text-3xl font-bold text-deepBlue md:text-4xl">Example analyses</h1>
+      <p className="mt-2 text-deepBlue/80">
         See what a NewSeries report looks like — these are mock results for design preview.
       </p>
 
@@ -27,14 +27,14 @@ export default function ExamplesPage() {
         {sampleAnalyses.map((sample, i) => (
           <div
             key={i}
-            className="rounded-xl border border-navy/10 bg-white p-6 shadow-md"
+            className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green"
           >
-            <h2 className="font-serif text-xl font-bold text-navy">{sample.title}</h2>
-            <p className="mt-1 text-sm text-navy/70">{sample.source}</p>
-            <p className="mt-3 text-navy/90 leading-relaxed">{sample.summary}</p>
+            <h2 className="font-serif text-xl font-bold text-deepBlue">{sample.title}</h2>
+            <p className="mt-1 text-sm text-deepBlue/70">{sample.source}</p>
+            <p className="mt-3 text-deepBlue/90 leading-relaxed">{sample.summary}</p>
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-sm text-navy/70">Bias meter:</span>
-              <span className="font-serif font-bold text-orange">{sample.biasScore}/100</span>
+              <span className="text-sm text-deepBlue/70">Bias meter:</span>
+              <span className="font-serif font-bold text-green">{sample.biasScore}/100</span>
             </div>
           </div>
         ))}
@@ -42,8 +42,8 @@ export default function ExamplesPage() {
 
       <div className="mt-10 text-center">
         <Link
-          href="/analyze"
-          className="inline-block rounded-full bg-orange px-8 py-4 font-semibold text-white transition hover:bg-orange/90"
+          href="/#analyze"
+          className="inline-block rounded-full bg-gradient-to-r from-green to-greenLight px-8 py-4 font-semibold text-white shadow-glow-green transition hover:shadow-glow-green-lg"
         >
           Try it yourself
         </Link>

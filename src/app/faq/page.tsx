@@ -28,17 +28,17 @@ const faqs = [
 export default function FAQPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="font-serif text-3xl font-bold text-navy md:text-4xl">Frequently Asked Questions</h1>
-      <p className="mt-2 text-navy/80">Quick answers about how NewSeries works and what to expect.</p>
+      <h1 className="font-serif text-3xl font-bold text-deepBlue md:text-4xl">Frequently Asked Questions</h1>
+      <p className="mt-2 text-deepBlue/80">Quick answers about how NewSeries works and what to expect.</p>
 
       <div className="mt-8 space-y-4">
         {faqs.map((faq, i) => (
           <div
             key={i}
-            className="rounded-xl border border-navy/10 bg-white p-6 shadow-sm"
+            className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green"
           >
-            <h2 className="font-semibold text-navy">{faq.q}</h2>
-            <p className="mt-2 text-navy/80 leading-relaxed">{faq.a}</p>
+            <h2 className="font-semibold text-deepBlue">{faq.q}</h2>
+            <p className="mt-2 text-deepBlue/80 leading-relaxed">{faq.a}</p>
           </div>
         ))}
       </div>
