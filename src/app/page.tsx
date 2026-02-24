@@ -86,25 +86,6 @@ function HomePageContent() {
         </div>
       </section>
 
-      {/* Why NewSeries */}
-      <section className="mx-auto max-w-6xl px-4 py-16">
-        <h2 className="font-serif text-3xl font-bold text-deepBlue md:text-4xl">Why NewSeries?</h2>
-        <p className="mt-2 text-deepBlue/80">
-          Built to help you understand how news is framed — not to tell you what to think.
-        </p>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {whyCards.map((card) => (
-            <div
-              key={card.title}
-              className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green"
-            >
-              <h3 className="font-serif text-xl font-bold text-deepBlue">{card.title}</h3>
-              <p className="mt-2 text-deepBlue/80">{card.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Analyze section */}
       <section id="analyze" className="border-t border-green/20 bg-gradient-to-b from-greenBg/50 to-blueLight py-16 scroll-mt-20">
         <div className="mx-auto max-w-3xl px-4">
@@ -170,6 +151,25 @@ function HomePageContent() {
               )}
             </button>
           </form>
+        </div>
+      </section>
+
+      {/* Why NewSeries */}
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <h2 className="font-serif text-3xl font-bold text-deepBlue md:text-4xl">Why NewSeries?</h2>
+        <p className="mt-2 text-deepBlue/80">
+          Built to help you understand how news is framed — not to tell you what to think.
+        </p>
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {whyCards.map((card) => (
+            <div
+              key={card.title}
+              className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green"
+            >
+              <h3 className="font-serif text-xl font-bold text-deepBlue">{card.title}</h3>
+              <p className="mt-2 text-deepBlue/80">{card.description}</p>
+            </div>
+          ))}
         </div>
       </section>
     </div>

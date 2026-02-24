@@ -38,10 +38,76 @@ const reflectionQuestions = [
   "What would you need to read next to form a more complete view?",
 ];
 
+type DifficultWordCategory = "Commonly Confused" | "Irregular Verbs" | "Phrasal Verbs" | "Idioms";
+
+type WordFilter = "All Words" | DifficultWordCategory;
+
+type DifficultWord = {
+  word: string;
+  definition: string;
+  example: string;
+  pronunciation: string;
+  category: DifficultWordCategory;
+};
+
+const WORD_FILTERS: { id: WordFilter; label: string }[] = [
+  { id: "All Words", label: "All Words" },
+  { id: "Commonly Confused", label: "Commonly Confused" },
+  { id: "Irregular Verbs", label: "Irregular Verbs" },
+  { id: "Phrasal Verbs", label: "Phrasal Verbs" },
+  { id: "Idioms", label: "Idioms" },
+];
+
+const categoryColorClasses: Record<DifficultWordCategory, string> = {
+  "Commonly Confused": "bg-blue-100 text-blue-900",
+  "Irregular Verbs": "bg-purple-100 text-purple-900",
+  "Phrasal Verbs": "bg-amber-100 text-amber-900",
+  Idioms: "bg-pink-100 text-pink-900",
+};
+
+const difficultWords: DifficultWord[] = [
+  {
+    word: "bias",
+    pronunciation: "BY-uss",
+    definition: "A feeling or opinion that makes you support one side more than another, even when you should be fair.",
+    example: "The article shows bias because it mostly supports the government’s point of view.",
+    category: "Commonly Confused",
+  },
+  {
+    word: "take effect",
+    pronunciation: "tayk eh-FEKT",
+    definition: "To start working or to begin to have a result.",
+    example: "The new policy will take effect next month.",
+    category: "Idioms",
+  },
+  {
+    word: "rely on",
+    pronunciation: "ri-LY on",
+    definition: "To depend on someone or something to do what you need.",
+    example: "The article seems to rely on only one main source.",
+    category: "Phrasal Verbs",
+  },
+  {
+    word: "leave out",
+    pronunciation: "leev owt",
+    definition: "To not include something or someone.",
+    example: "The writer leaves out important background information.",
+    category: "Phrasal Verbs",
+  },
+  {
+    word: "read (past: read)",
+    pronunciation: "reed (past: red)",
+    definition: "To look at and understand written words. In the past tense, the spelling stays the same but the sound changes.",
+    example: "You may have read only one article, but you can look for more sources.",
+    category: "Irregular Verbs",
+  },
+];
+
 const METER_SCORE = 65;
 
 export default function ResultsPage() {
   const [meterWidth, setMeterWidth] = useState(0);
+  const [activeFilter, setActiveFilter] = useState<WordFilter>("All Words");
 
   useEffect(() => {
     const t = requestAnimationFrame(() => {
@@ -122,6 +188,71 @@ export default function ResultsPage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      {/* ESL Difficult Words */}
+      <section className="mt-10 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Difficult Words in This Article</h2>
+            <p className="mt-1 text-sm text-deepBlue/80">
+              Learn key vocabulary from this article with simple meanings, pronunciation, and examples.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {WORD_FILTERS.map((filter) => {
+              const isActive = activeFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => setActiveFilter(filter.id)}
+                  className={
+                    "rounded-full px-3 py-1 text-sm font-medium border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green " +
+                    (isActive
+                      ? "border-green bg-gradient-to-r from-green to-greenLight text-white shadow-glow-green"
+                      : "border-deepBlue/10 bg-white/60 text-deepBlue/80 hover:border-green/60 hover:text-deepBlue")
+                  }
+                  aria-pressed={isActive}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {(activeFilter === "All Words"
+            ? difficultWords
+            : difficultWords.filter((word) => word.category === activeFilter)
+          ).map((word) => (
+            <article
+              key={word.word}
+              className="flex h-full flex-col rounded-xl border border-green/20 bg-white/70 p-4 shadow-sm"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="text-lg font-semibold text-deepBlue">{word.word}</h3>
+                <span
+                  className={
+                    "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold " +
+                    categoryColorClasses[word.category]
+                  }
+                >
+                  {word.category}
+                </span>
+              </div>
+              <p className="mt-1 text-xs uppercase tracking-wide text-deepBlue/60">
+                Pronunciation:{" "}
+                <span className="font-semibold text-deepBlue/80">{word.pronunciation}</span>
+              </p>
+              <p className="mt-3 text-[15px] leading-relaxed text-deepBlue/90">{word.definition}</p>
+              <p className="mt-3 text-sm text-deepBlue/80">
+                <span className="font-semibold text-deepBlue">Example:</span> {word.example}
+              </p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="mt-10 text-center">
