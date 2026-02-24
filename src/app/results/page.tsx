@@ -3,40 +3,10 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
-const biasSignals = [
-  {
-    title: "Loaded language",
-    explanation: "Phrases like 'slams' and 'blasted' suggest conflict and blame rather than neutral reporting.",
-  },
-  {
-    title: "Single-source framing",
-    explanation: "The piece relies heavily on one official source without contrasting viewpoints.",
-  },
-  {
-    title: "Emotional framing",
-    explanation: "Headline and lead emphasize fear or urgency that may skew reader perception.",
-  },
-  {
-    title: "Omission of context",
-    explanation: "Key background or prior events that would balance the narrative are not mentioned.",
-  },
-];
-
-const keyFacts = [
-  "The policy was announced on Tuesday and takes effect next month.",
-  "Three independent studies have been cited; methodology varies.",
-  "The figure of 65% comes from a government report released in 2024.",
-  "Opposition groups have called for a delay; no vote has been scheduled.",
-  "Similar measures exist in at least five other countries.",
-  "The agency in charge has not yet commented on implementation details.",
-];
-
-const reflectionQuestions = [
-  "Who benefits from this framing, and who might be left out?",
-  "What would a headline from the 'other side' look like?",
-  "Which claims are verified with evidence vs. asserted?",
-  "What would you need to read next to form a more complete view?",
-];
+type BiasSignal = {
+  title: string;
+  explanation: string;
+};
 
 type DifficultWordCategory = "Commonly Confused" | "Irregular Verbs" | "Phrasal Verbs" | "Idioms";
 
@@ -48,6 +18,15 @@ type DifficultWord = {
   example: string;
   pronunciation: string;
   category: DifficultWordCategory;
+};
+
+type AnalysisResponse = {
+  summary: string;
+  biasScore: number;
+  biasSignals: BiasSignal[];
+  keyFacts: string[];
+  reflectionQuestions: string[];
+  difficultWords: DifficultWord[];
 };
 
 const WORD_FILTERS: { id: WordFilter; label: string }[] = [
@@ -65,130 +44,168 @@ const categoryColorClasses: Record<DifficultWordCategory, string> = {
   Idioms: "bg-pink-100 text-pink-900",
 };
 
-const difficultWords: DifficultWord[] = [
-  {
-    word: "bias",
-    pronunciation: "BY-uss",
-    definition: "A feeling or opinion that makes you support one side more than another, even when you should be fair.",
-    example: "The article shows bias because it mostly supports the government’s point of view.",
-    category: "Commonly Confused",
-  },
-  {
-    word: "take effect",
-    pronunciation: "tayk eh-FEKT",
-    definition: "To start working or to begin to have a result.",
-    example: "The new policy will take effect next month.",
-    category: "Idioms",
-  },
-  {
-    word: "rely on",
-    pronunciation: "ri-LY on",
-    definition: "To depend on someone or something to do what you need.",
-    example: "The article seems to rely on only one main source.",
-    category: "Phrasal Verbs",
-  },
-  {
-    word: "leave out",
-    pronunciation: "leev owt",
-    definition: "To not include something or someone.",
-    example: "The writer leaves out important background information.",
-    category: "Phrasal Verbs",
-  },
-  {
-    word: "read (past: read)",
-    pronunciation: "reed (past: red)",
-    definition: "To look at and understand written words. In the past tense, the spelling stays the same but the sound changes.",
-    example: "You may have read only one article, but you can look for more sources.",
-    category: "Irregular Verbs",
-  },
-];
-
-const METER_SCORE = 65;
+function stripMarkdown(text: string): string {
+  if (!text || typeof text !== "string") return text;
+  return (
+    text
+      // Remove ATX-style headings (##, ###, etc.)
+      .replace(/^#{1,6}\s*/gm, "")
+      // Remove bold/italic ** __ * _
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/__(.+?)__/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/_(.+?)_/g, "$1")
+      // Replace link [text](url) with text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      // Remove inline code backticks
+      .replace(/`([^`]+)`/g, "$1")
+      // Collapse multiple spaces/newlines from stripped headings
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
+}
 
 export default function ResultsPage() {
   const [meterWidth, setMeterWidth] = useState(0);
   const [activeFilter, setActiveFilter] = useState<WordFilter>("All Words");
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = requestAnimationFrame(() => {
-      setTimeout(() => setMeterWidth(METER_SCORE), 100);
-    });
-    return () => cancelAnimationFrame(t);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const raw = sessionStorage.getItem("newseries-latest-analysis");
+      if (!raw) {
+        setError("No recent analysis found. Please analyze an article first.");
+        setLoading(false);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as AnalysisResponse;
+      setAnalysis(parsed);
+
+      const targetScore = parsed.biasScore ?? 65;
+      const clamped = Math.min(100, Math.max(0, targetScore));
+
+      const t = requestAnimationFrame(() => {
+        setTimeout(() => setMeterWidth(clamped), 100);
+      });
+
+      return () => cancelAnimationFrame(t);
+    } catch (err) {
+      console.error(err);
+      setError("There was a problem loading your analysis. Please try again.");
+      setLoading(false);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="font-serif text-3xl font-bold text-deepBlue">Analysis Results</h1>
-      <p className="mt-1 text-deepBlue/70">Mock results — for design preview only.</p>
+      <p className="mt-1 text-deepBlue/70">
+        Explore how this article is framed and where you might look for additional context.
+      </p>
 
-      {/* Summary */}
-      <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
-        <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
-        <p className="mt-3 text-deepBlue/90 leading-relaxed">
-          This article presents a policy announcement with moderate bias indicators. The tone leans
-          toward one perspective through word choice and source selection, while several verifiable
-          facts are included. We detected loaded language, limited source diversity, and some
-          emotional framing. The piece is still informative but benefits from reading alongside
-          other sources.
-        </p>
-      </section>
-
-      {/* Bias meter - animated fill */}
-      <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
-        <h2 className="font-serif text-xl font-bold text-deepBlue">Bias meter</h2>
-        <div className="mt-3 flex items-center gap-4">
-          <div className="relative h-8 w-full max-w-xs overflow-hidden rounded-full bg-deepBlue/20">
-            <div
-              className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-green to-greenLight shadow-glow-green transition-all duration-1000 ease-out"
-              style={{ width: `${meterWidth}%` }}
-            />
-          </div>
-          <span className="font-serif text-2xl font-bold text-deepBlue">{METER_SCORE}/100</span>
+      {loading && (
+        <div className="mt-6 rounded-xl border border-green/20 bg-blueLight/60 p-4 text-deepBlue/80">
+          <p>Loading your latest analysis...</p>
         </div>
-        <p className="mt-1 text-sm text-deepBlue/70">Higher score = more neutral; lower = more biased.</p>
-      </section>
+      )}
 
-      {/* Bias signals */}
-      <section className="mt-8">
-        <h2 className="font-serif text-xl font-bold text-deepBlue">Bias signals detected</h2>
-        <ul className="mt-4 space-y-4">
-          {biasSignals.map((s) => (
-            <li
-              key={s.title}
-              className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-4 shadow-lg shadow-green/10 transition hover:shadow-glow-green"
-            >
-              <h3 className="font-semibold text-deepBlue">{s.title}</h3>
-              <p className="mt-1 text-sm text-deepBlue/80">{s.explanation}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {error && !loading && (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p>{error}</p>
+          <p className="mt-2">
+            Try going back to the{" "}
+            <Link href="/#analyze" className="font-semibold text-green underline">
+              analyzer
+            </Link>{" "}
+            and submitting an article again.
+          </p>
+        </div>
+      )}
 
-      {/* Key facts */}
-      <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
-        <h2 className="font-serif text-xl font-bold text-deepBlue">Key facts</h2>
-        <ul className="mt-4 list-inside list-disc space-y-2 text-deepBlue/90">
-          {keyFacts.map((fact, i) => (
-            <li key={i}>{fact}</li>
-          ))}
-        </ul>
-      </section>
+      {!loading && !error && !analysis && (
+        <div className="mt-6 rounded-xl border border-green/20 bg-blueLight/60 p-4 text-deepBlue/80">
+          <p>No analysis data found. Please analyze an article first.</p>
+        </div>
+      )}
 
-      {/* Think About It */}
-      <section className="mt-8 rounded-xl border-2 border-green/40 bg-greenBg/80 p-6 shadow-glow-green">
-        <h2 className="font-serif text-xl font-bold text-deepBlue">Think About It</h2>
-        <p className="mt-2 text-deepBlue/80">
-          Use these questions to reflect on what you read and how it was presented.
-        </p>
-        <ul className="mt-4 space-y-2">
-          {reflectionQuestions.map((q, i) => (
-            <li key={i} className="flex gap-2">
-              <span className="text-green font-medium">{i + 1}.</span>
-              <span className="text-deepBlue/90">{q}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {!loading && analysis && (
+        <>
+
+          {/* Summary */}
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
+            <p className="mt-3 text-deepBlue/90 leading-relaxed">{stripMarkdown(analysis.summary)}</p>
+          </section>
+
+          {/* Bias meter - animated fill */}
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Bias meter</h2>
+            <div className="mt-3 flex items-center gap-4">
+              <div className="relative h-8 w-full max-w-xs overflow-hidden rounded-full bg-deepBlue/20">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-green to-greenLight shadow-glow-green transition-all duration-1000 ease-out"
+                  style={{ width: `${meterWidth}%` }}
+                />
+              </div>
+              <span className="font-serif text-2xl font-bold text-deepBlue">
+                {analysis.biasScore}/100
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-deepBlue/70">
+              Higher score = more neutral; lower = more biased.
+            </p>
+          </section>
+
+          {/* Bias signals */}
+          <section className="mt-8">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Bias signals detected</h2>
+            <ul className="mt-4 space-y-4">
+              {analysis.biasSignals.map((s) => (
+                <li
+                  key={s.title}
+                  className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-4 shadow-lg shadow-green/10 transition hover:shadow-glow-green"
+                >
+                  <h3 className="font-semibold text-deepBlue">{s.title}</h3>
+                  <p className="mt-1 text-sm text-deepBlue/80">{s.explanation}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* Key facts */}
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Key facts</h2>
+            <ul className="mt-4 list-inside list-disc space-y-2 text-deepBlue/90">
+              {analysis.keyFacts.map((fact, i) => (
+                <li key={i}>{fact}</li>
+              ))}
+            </ul>
+          </section>
+
+          {/* Think About It */}
+          <section className="mt-8 rounded-xl border-2 border-green/40 bg-greenBg/80 p-6 shadow-glow-green">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Think About It</h2>
+            <p className="mt-2 text-deepBlue/80">
+              Use these questions to reflect on what you read and how it was presented.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {analysis.reflectionQuestions.map((q, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-green font-medium">{i + 1}.</span>
+                  <span className="text-deepBlue/90">{q}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
 
       {/* ESL Difficult Words */}
       <section className="mt-10 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
@@ -224,8 +241,8 @@ export default function ResultsPage() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {(activeFilter === "All Words"
-            ? difficultWords
-            : difficultWords.filter((word) => word.category === activeFilter)
+            ? analysis.difficultWords
+            : analysis.difficultWords.filter((word) => word.category === activeFilter)
           ).map((word) => (
             <article
               key={word.word}
@@ -255,14 +272,16 @@ export default function ResultsPage() {
         </div>
       </section>
 
-      <div className="mt-10 text-center">
-        <Link
-          href="/#analyze"
-          className="inline-block rounded-full bg-gradient-to-r from-green to-greenLight px-8 py-4 font-semibold text-white shadow-glow-green transition hover:shadow-glow-green-lg"
-        >
-          Analyze Another
-        </Link>
-      </div>
+          <div className="mt-10 text-center">
+            <Link
+              href="/#analyze"
+              className="inline-block rounded-full bg-gradient-to-r from-green to-greenLight px-8 py-4 font-semibold text-white shadow-glow-green transition hover:shadow-glow-green-lg"
+            >
+              Analyze Another
+            </Link>
+          </div>
+        </>
+      )}
     </div>
   );
 }

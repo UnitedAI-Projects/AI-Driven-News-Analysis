@@ -48,6 +48,7 @@ function HomePageContent() {
   const [articleText, setArticleText] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const u = searchParams.get("url");
@@ -59,11 +60,52 @@ function HomePageContent() {
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    const trimmedText = articleText.trim();
+    const trimmedUrl = url.trim();
+
+    if (!trimmedText && !trimmedUrl) {
+      setError("Please enter an article URL or paste the article text to analyze.");
+      return;
+    }
+
     setLoading(true);
-    if (url.trim()) saveToHistory(url.trim());
-    await new Promise((r) => setTimeout(r, 2000));
-    setLoading(false);
-    router.push("/results");
+    if (trimmedUrl) saveToHistory(trimmedUrl);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          articleText: trimmedText,
+          url: trimmedUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze article. Please try again.");
+      }
+
+      const data = await response.json();
+
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("newseries-latest-analysis", JSON.stringify(data));
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      router.push("/results");
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,6 +137,11 @@ function HomePageContent() {
           </p>
 
           <form onSubmit={handleAnalyze} className="mt-8 space-y-6">
+            {error && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {error}
+              </p>
+            )}
             <div>
               <label htmlFor="url" className="block font-medium text-deepBlue">
                 Article URL (optional)
