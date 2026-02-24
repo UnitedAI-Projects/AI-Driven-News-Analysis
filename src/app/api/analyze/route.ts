@@ -268,13 +268,15 @@ export async function POST(request: NextRequest) {
       (typeof body?.articleText === "string" ? body.articleText : "") ||
       (typeof body?.text === "string" ? body.text : "");
     let url = typeof body?.url === "string" ? body.url : null;
+    let articleTitle: string | null = null;
 
     if (articleText?.trim() && looksLikeUrl(articleText.trim())) {
       const toFetch = articleText.trim();
       try {
-        const { text } = await fetchArticleTextFromUrl(toFetch);
+        const { text, title } = await fetchArticleTextFromUrl(toFetch);
         articleText = text;
         url = url || toFetch;
+        articleTitle = title ?? null;
       } catch (err) {
         console.error("Error fetching URL:", err);
         return NextResponse.json(
@@ -284,8 +286,9 @@ export async function POST(request: NextRequest) {
       }
     } else if ((!articleText || !articleText.trim()) && url?.trim() && looksLikeUrl(url.trim())) {
       try {
-        const { text } = await fetchArticleTextFromUrl(url.trim());
+        const { text, title } = await fetchArticleTextFromUrl(url.trim());
         articleText = text;
+        articleTitle = title ?? null;
       } catch (err) {
         console.error("Error fetching URL:", err);
         return NextResponse.json(
@@ -299,7 +302,11 @@ export async function POST(request: NextRequest) {
     const summaryFromClaude = await getSummaryFromClaude(resolvedText);
     const analysis = analyzeText(resolvedText, url || null, summaryFromClaude);
 
-    return NextResponse.json(analysis);
+    return NextResponse.json({
+      ...analysis,
+      articleTitle: articleTitle ?? null,
+      url: url ?? null,
+    });
   } catch (error) {
     console.error("Error in /api/analyze:", error);
     return NextResponse.json(

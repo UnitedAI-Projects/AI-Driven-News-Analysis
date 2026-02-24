@@ -27,6 +27,8 @@ type AnalysisResponse = {
   keyFacts: string[];
   reflectionQuestions: string[];
   difficultWords: DifficultWord[];
+  articleTitle?: string | null;
+  url?: string | null;
 };
 
 const WORD_FILTERS: { id: WordFilter; label: string }[] = [

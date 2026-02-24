@@ -6,7 +6,11 @@ import Link from "next/link";
 
 const HISTORY_KEY = "newseries-analysis-history";
 
-type HistoryItem = { url: string; timestamp: string };
+type HistoryItem = {
+  url: string;
+  title?: string | null;
+  timestamp: string;
+};
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -54,7 +58,7 @@ export default function HistoryPage() {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="font-serif text-3xl font-bold text-deepBlue md:text-4xl">History</h1>
       <p className="mt-2 text-deepBlue/80">
-        Past URLs you've analyzed. Click a URL to re-analyze it.
+        Past articles you've analyzed. Click a title to re-analyze it.
       </p>
 
       {items.length > 0 ? (
@@ -79,7 +83,9 @@ export default function HistoryPage() {
                   onClick={() => reAnalyze(item.url)}
                   className="w-full text-left"
                 >
-                  <p className="font-medium text-deepBlue break-all">{item.url}</p>
+                  <p className="font-medium text-deepBlue break-all">
+                    {item.title?.trim() || item.url}
+                  </p>
                   <p className="mt-1 text-sm text-deepBlue/60">{formatDate(item.timestamp)}</p>
                 </button>
               </li>

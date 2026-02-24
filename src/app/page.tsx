@@ -32,12 +32,18 @@ const whyCards = [
 
 const HISTORY_KEY = "newseries-analysis-history";
 
-function saveToHistory(url: string) {
+type HistoryItem = {
+  url: string;
+  title?: string | null;
+  timestamp: string;
+};
+
+function saveToHistory(url: string, title?: string | null) {
   if (!url || !url.trim()) return;
   try {
     const raw = typeof window !== "undefined" ? localStorage.getItem(HISTORY_KEY) : null;
-    const list: { url: string; timestamp: string }[] = raw ? JSON.parse(raw) : [];
-    list.unshift({ url: url.trim(), timestamp: new Date().toISOString() });
+    const list: HistoryItem[] = raw ? JSON.parse(raw) : [];
+    list.unshift({ url: url.trim(), title: title?.trim() || undefined, timestamp: new Date().toISOString() });
     localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 100)));
   } catch (_) {}
 }
@@ -71,8 +77,6 @@ function HomePageContent() {
     }
 
     setLoading(true);
-    if (trimmedUrl) saveToHistory(trimmedUrl);
-
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
@@ -90,6 +94,12 @@ function HomePageContent() {
       }
 
       const data = await response.json();
+
+      if (trimmedUrl) {
+        const articleTitle =
+          typeof data?.articleTitle === "string" && data.articleTitle.trim() ? data.articleTitle.trim() : undefined;
+        saveToHistory(trimmedUrl, articleTitle);
+      }
 
       if (typeof window !== "undefined") {
         try {
