@@ -1,6 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
 import { NextRequest, NextResponse } from "next/server";
 
 const ANTHROPIC = process.env.ANTHROPIC_API_KEY
@@ -13,6 +11,9 @@ function looksLikeUrl(s: string): boolean {
 }
 
 async function fetchArticleTextFromUrl(url: string): Promise<{ text: string; title?: string }> {
+  const { JSDOM } = await import("jsdom");
+  const { Readability } = await import("@mozilla/readability");
+
   const res = await fetch(url, {
     headers: {
       "User-Agent":
