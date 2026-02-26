@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 const whyCards = [
   {
@@ -123,9 +124,12 @@ function HomePageContent() {
       {/* Hero */}
       <section className="bg-gradient-to-br from-deepBlue to-deepBlue/90 text-blueLight">
         <div className="mx-auto max-w-4xl px-4 py-20 text-center md:py-28">
-          <h1 className="font-serif text-4xl font-bold leading-tight md:text-5xl">
-            Cutting Through the Noise to Find the Truth
-          </h1>
+        <div className="flex items-center justify-center mb-6">
+       <Image src="/WWW.png" alt="NewSeries" width={300} height={90} />
+       </div>
+       <h1 className="font-serif text-4xl font-bold leading-tight md:text-5xl">
+       Built to help you understand how news is framed — not to tell you what to think.
+      </h1>
           <p className="mt-4 text-lg text-blueLight/90">
             NewSeries analyzes news articles for bias so you can read with clarity and confidence.
           </p>
@@ -215,7 +219,7 @@ function HomePageContent() {
       <section className="mx-auto max-w-6xl px-4 py-16">
         <h2 className="font-serif text-3xl font-bold text-deepBlue md:text-4xl">Why NewSeries?</h2>
         <p className="mt-2 text-deepBlue/80">
-          Built to help you understand how news is framed — not to tell you what to think.
+          Cutting through the noise to find the truth.
         </p>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {whyCards.map((card) => (

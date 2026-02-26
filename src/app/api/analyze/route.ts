@@ -134,23 +134,60 @@ async function getSummaryFromClaude(articleText: string): Promise<string | null>
   }
 }
 
+const DIFFICULT_WORDS_SYSTEM_PROMPT = `You are an ESL vocabulary assistant. Your job is to find 4-6 difficult or advanced words from the article that ESL learners might struggle with.
+
+For each word return a JSON array with this exact structure:
+[
+  {
+    "word": "the word or phrase",
+    "pronunciation": "simple phonetic pronunciation in caps e.g. BY-uss",
+    "definition": "simple definition in plain English",
+    "example": "a short example sentence using the word in context from the article",
+    "category": "Commonly Confused" or "Irregular Verbs" or "Phrasal Verbs" or "Idioms"
+  }
+]
+
+Return ONLY the JSON array, no other text.`;
+
+async function getDifficultWordsFromClaude(articleText: string): Promise<DifficultWord[]> {
+  if (!ANTHROPIC || !articleText.trim()) return BASE_DIFFICULT_WORDS;
+  const truncated = articleText.length > 120000 ? articleText.slice(0, 120000) : articleText;
+  try {
+    const msg = await ANTHROPIC.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: DIFFICULT_WORDS_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `Find 4-6 difficult words from this article for ESL learners:\n\n${truncated}`,
+        },
+      ],
+    });
+    const block = msg.content.find((b) => b.type === "text");
+    if (!block || !("text" in block)) return BASE_DIFFICULT_WORDS;
+    const parsed = JSON.parse(block.text.trim());
+    return Array.isArray(parsed) ? parsed : BASE_DIFFICULT_WORDS;
+  } catch {
+    return BASE_DIFFICULT_WORDS;
+  }
+}
+
 function analyzeText(
   rawText: string,
   url?: string | null,
   summaryOverride?: string | null,
+  difficultWordsOverride?: DifficultWord[],
 ): AnalysisResponse {
   const text = rawText.trim();
 
-  // Basic stats
   const words = text ? text.split(/\s+/).filter(Boolean) : [];
   const wordCount = words.length;
   const estimatedReadMinutes = wordCount > 0 ? Math.max(1, Math.round(wordCount / 200)) : 0;
 
   const hasLoadedLanguage = /slam(?:s|med)?|blast(?:s|ed)?|disaster|outrage|furious/i.test(text);
   const hasSingleSourceFraming = /according to|officials say|experts say|sources say/i.test(text);
-  const hasEmotionalFraming = /shocking|terrifying|heartbreaking|outrageous|furious|furiously/i.test(
-    text,
-  );
+  const hasEmotionalFraming = /shocking|terrifying|heartbreaking|outrageous|furious|furiously/i.test(text);
   const hasOmissionHints = /however|critics say|supporters say|on the other hand/i.test(text);
 
   let biasScore = 80;
@@ -257,7 +294,7 @@ function analyzeText(
         ],
     keyFacts,
     reflectionQuestions,
-    difficultWords: BASE_DIFFICULT_WORDS,
+    difficultWords: difficultWordsOverride ?? BASE_DIFFICULT_WORDS,
   };
 }
 
@@ -300,7 +337,8 @@ export async function POST(request: NextRequest) {
 
     const resolvedText = articleText?.trim() ?? "";
     const summaryFromClaude = await getSummaryFromClaude(resolvedText);
-    const analysis = analyzeText(resolvedText, url || null, summaryFromClaude);
+    const difficultWordsFromClaude = await getDifficultWordsFromClaude(resolvedText);
+    const analysis = analyzeText(resolvedText, url || null, summaryFromClaude, difficultWordsFromClaude);
 
     return NextResponse.json({
       ...analysis,
@@ -317,4 +355,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
