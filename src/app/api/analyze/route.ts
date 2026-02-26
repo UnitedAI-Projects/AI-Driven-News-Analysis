@@ -244,7 +244,7 @@ function analyzeText(
   const numberMatches = text.match(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b/g);
   if (numberMatches && numberMatches.length > 0) {
     keyFacts.push(
-      `We detected numerical claims such as ${[...new Set(numberMatches)].slice(0, 3).join(
+      `We detected numerical claims such as ${Array.from(new Set(numberMatches)).slice(0, 3).join(
         ", ",
       )}. Check how these figures were produced and whether they are presented with enough context.`,
     );
@@ -253,7 +253,7 @@ function analyzeText(
   const yearMatches = text.match(/\b(19|20)\d{2}\b/g);
   if (yearMatches && yearMatches.length > 0) {
     keyFacts.push(
-      `The article references specific years (${[...new Set(yearMatches)].slice(0, 3).join(
+      `The article references specific years (${Array.from(new Set(yearMatches)).slice(0, 3).join(
         ", ",
       )}), which can be helpful for tracing timelines and comparing with other sources.`,
     );
