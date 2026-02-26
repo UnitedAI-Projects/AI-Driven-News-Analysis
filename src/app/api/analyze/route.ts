@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { parse } from "node-html-parser";
 
 const ANTHROPIC = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -11,9 +12,6 @@ function looksLikeUrl(s: string): boolean {
 }
 
 async function fetchArticleTextFromUrl(url: string): Promise<{ text: string; title?: string }> {
-  const { JSDOM } = await import("jsdom");
-  const { Readability } = await import("@mozilla/readability");
-
   const res = await fetch(url, {
     headers: {
       "User-Agent":
@@ -22,15 +20,26 @@ async function fetchArticleTextFromUrl(url: string): Promise<{ text: string; tit
   });
   if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
   const html = await res.text();
-  const dom = new JSDOM(html, { url });
-  const reader = new Readability(dom.window.document);
-  const article = reader.parse();
-  if (!article?.textContent?.trim()) {
-    const body = dom.window.document.body?.textContent?.trim() ?? "";
-    return { text: body.slice(0, 100000), title: undefined };
-  }
-  const title = article.title ? `${article.title}\n\n` : "";
-  return { text: title + article.textContent.trim(), title: article.title ?? undefined };
+  const root = parse(html);
+
+  // Remove scripts, styles, nav, footer
+  root.querySelectorAll("script, style, nav, footer, header, aside").forEach(el => el.remove());
+
+  const title = root.querySelector("title")?.text?.trim() ?? undefined;
+
+  // Try to get article content
+  const articleEl =
+    root.querySelector("article") ??
+    root.querySelector('[role="main"]') ??
+    root.querySelector("main") ??
+    root.querySelector(".article-body") ??
+    root.querySelector(".story-body") ??
+    root.querySelector(".post-content") ??
+    root.querySelector("#content") ??
+    root.querySelector("body");
+
+  const text = articleEl?.text?.replace(/\s+/g, " ").trim() ?? "";
+  return { text: text.slice(0, 100000), title };
 }
 
 type BiasSignal = {
