@@ -30,7 +30,7 @@ export default function Nav() {
             alt="NewSeries"
             width={220}
             height={66}
-            className="h-12 w-auto object-contain object-left transition-transform duration-200 group-hover:animate-logo-bounce sm:h-14 md:h-16"
+            className="h-12 w-auto object-contain object-left transition-transform duration-200 group-hover:animate-logo-bounce sm:h-14 md:h-16 mix-blend-multiply"
           />
         </Link>
         <ul className="hidden items-center gap-6 md:flex">
