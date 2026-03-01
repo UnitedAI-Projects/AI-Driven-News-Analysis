@@ -114,8 +114,8 @@ async function getBiasAnalysisFromClaude(articleText: string): Promise<{ score: 
   try {
     const msg = await ANTHROPIC.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      system: `You are a media bias analyst. Identify words or phrases in the article that show bias.
+      max_tokens: 4096,
+      system: `You are a media bias analyst. Identify the top 5 most significant words or phrases in the article that show bias.
 For each flagged item return:
 - "text": the exact word or phrase from the article
 - "type": one of ["loaded_language", "opinion_as_fact", "unverified_claim", "framing_bias"]

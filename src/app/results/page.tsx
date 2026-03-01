@@ -69,18 +69,16 @@ const biasTypeLabels: Record<BiasFlag["type"], string> = {
 
 function stripMarkdown(text: string): string {
   if (!text || typeof text !== "string") return text;
-  return (
-    text
-      .replace(/^#{1,6}\s*/gm, "")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/__(.+?)__/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/_(.+?)_/g, "$1")
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/`([^`]+)`/g, "$1")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim()
-  );
+  return text
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/_(.+?)_/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export default function ResultsPage() {
@@ -92,7 +90,6 @@ export default function ResultsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     try {
       const raw = sessionStorage.getItem("newseries-latest-analysis");
       if (!raw) {
@@ -100,17 +97,13 @@ export default function ResultsPage() {
         setLoading(false);
         return;
       }
-
       const parsed = JSON.parse(raw) as AnalysisResponse;
       setAnalysis(parsed);
-
       const targetScore = parsed.biasScore ?? 65;
       const clamped = Math.min(100, Math.max(0, targetScore));
-
       const t = requestAnimationFrame(() => {
         setTimeout(() => setMeterWidth(clamped), 100);
       });
-
       return () => cancelAnimationFrame(t);
     } catch (err) {
       console.error(err);
@@ -187,22 +180,44 @@ export default function ResultsPage() {
               <p className="mt-1 text-sm text-deepBlue/70">
                 These words or phrases were flagged as potentially biased.
               </p>
+
+              {/* Legend */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
+                  <span className="rounded-full border border-yellow-300 bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">
+                    Loaded Language
+                  </span>
+                  <span className="text-xs text-deepBlue/70">Emotionally charged words to provoke a reaction</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
+                  <span className="rounded-full border border-blue-300 bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
+                    Framing Bias
+                  </span>
+                  <span className="text-xs text-deepBlue/70">Facts presented in a slanted or one-sided way</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
+                  <span className="rounded-full border border-orange-300 bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">
+                    Opinion as Fact
+                  </span>
+                  <span className="text-xs text-deepBlue/70">Personal opinions stated as verified truths</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
+                  <span className="rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+                    Unverified Claim
+                  </span>
+                  <span className="text-xs text-deepBlue/70">Statements presented as true without evidence</span>
+                </div>
+              </div>
+
+              {/* Flagged items */}
               <ul className="mt-4 space-y-3">
                 {analysis.biasFlagged.map((flag, i) => (
-                  <li
-                    key={i}
-                    className="rounded-xl border border-green/10 bg-white/70 p-4 shadow-sm"
-                  >
+                  <li key={i} className="rounded-xl border border-green/10 bg-white/70 p-4 shadow-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-deepBlue/10 px-2 py-1 font-semibold text-deepBlue text-sm">
                         "{flag.text}"
                       </span>
-                      <span
-                        className={
-                          "rounded-full px-2.5 py-0.5 text-xs font-semibold " +
-                          biasBadgeColors[flag.type]
-                        }
-                      >
+                      <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + biasBadgeColors[flag.type]}>
                         {biasTypeLabels[flag.type]}
                       </span>
                     </div>
