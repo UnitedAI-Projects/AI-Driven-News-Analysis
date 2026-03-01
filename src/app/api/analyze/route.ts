@@ -81,6 +81,13 @@ const BASE_DIFFICULT_WORDS: DifficultWord[] = [
   },
 ];
 
+// ── Helper ─────────────────────────────────────────────────────────────────────
+
+function parseJSON(text: string) {
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  return JSON.parse(cleaned);
+}
+
 // ── Claude calls ───────────────────────────────────────────────────────────────
 
 async function getSummaryFromClaude(articleText: string): Promise<string | null> {
@@ -95,7 +102,8 @@ async function getSummaryFromClaude(articleText: string): Promise<string | null>
     });
     const block = msg.content.find((b) => b.type === "text");
     return block && "text" in block ? block.text.trim() : null;
-  } catch {
+  } catch (e) {
+    console.log("Summary error:", e);
     return null;
   }
 }
@@ -114,15 +122,20 @@ For each flagged item return:
 - "explanation": one sentence explaining why it is biased
 Also return a "score" from 0–100 (100 = fully neutral, 0 = highly biased).
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with no markdown formatting:
 { "score": <number>, "flagged": [{ "text": "...", "type": "...", "explanation": "..." }] }`,
       messages: [{ role: "user", content: `Analyze bias in this article:\n\n${truncated}` }],
     });
     const block = msg.content.find((b) => b.type === "text");
-    if (!block || !("text" in block)) return { score: 75, flagged: [] };
-    const parsed = JSON.parse(block.text.trim());
+    if (!block || !("text" in block)) {
+      console.log("Bias: no text block found");
+      return { score: 75, flagged: [] };
+    }
+    console.log("Bias raw response:", block.text.slice(0, 300));
+    const parsed = parseJSON(block.text);
     return { score: parsed.score ?? 75, flagged: parsed.flagged ?? [] };
-  } catch {
+  } catch (e) {
+    console.log("Bias parse error:", e);
     return { score: 75, flagged: [] };
   }
 }
@@ -134,14 +147,19 @@ async function getKeyFactsFromClaude(articleText: string): Promise<string[]> {
     const msg = await ANTHROPIC.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 512,
-      system: `You are a news summarizer. Extract 3–5 key factual claims (who, what, when, where). Facts only — no opinions. Return ONLY a JSON array of strings: ["fact 1", "fact 2"]`,
+      system: `You are a news summarizer. Extract 3–5 key factual claims from the article (who, what, when, where). Facts only — no opinions. Return ONLY a JSON array of strings with no markdown formatting: ["fact 1", "fact 2"]`,
       messages: [{ role: "user", content: `Extract key facts:\n\n${truncated}` }],
     });
     const block = msg.content.find((b) => b.type === "text");
-    if (!block || !("text" in block)) return [];
-    const parsed = JSON.parse(block.text.trim());
+    if (!block || !("text" in block)) {
+      console.log("Key facts: no text block found");
+      return [];
+    }
+    console.log("Key facts raw response:", block.text.slice(0, 300));
+    const parsed = parseJSON(block.text);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (e) {
+    console.log("Key facts parse error:", e);
     return [];
   }
 }
@@ -153,14 +171,19 @@ async function getReflectionQuestionsFromClaude(articleText: string): Promise<st
     const msg = await ANTHROPIC.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 512,
-      system: `You are a critical thinking educator. Generate exactly 4 thought-provoking questions about this specific article. Every question must reference specific details, people, or events from the article. Do NOT write generic questions. Return ONLY a JSON array of 4 strings.`,
+      system: `You are a critical thinking educator. Generate exactly 4 thought-provoking questions about this specific article. Every question must reference specific details, people, or events from the article. Do NOT write generic questions. Return ONLY a JSON array of 4 strings with no markdown formatting.`,
       messages: [{ role: "user", content: `Generate 4 critical thinking questions:\n\n${truncated}` }],
     });
     const block = msg.content.find((b) => b.type === "text");
-    if (!block || !("text" in block)) return BASE_REFLECTION_QUESTIONS;
-    const parsed = JSON.parse(block.text.trim());
+    if (!block || !("text" in block)) {
+      console.log("Reflection: no text block found");
+      return BASE_REFLECTION_QUESTIONS;
+    }
+    console.log("Reflection raw response:", block.text.slice(0, 300));
+    const parsed = parseJSON(block.text);
     return Array.isArray(parsed) && parsed.length === 4 ? parsed : BASE_REFLECTION_QUESTIONS;
-  } catch {
+  } catch (e) {
+    console.log("Reflection parse error:", e);
     return BASE_REFLECTION_QUESTIONS;
   }
 }
@@ -173,15 +196,20 @@ async function getDifficultWordsFromClaude(articleText: string): Promise<Difficu
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
       system: `You are an ESL vocabulary assistant. Find 4–6 difficult words or phrases that actually appear in the article and that ESL learners might struggle with. Do NOT include everyday words.
-Return ONLY a JSON array:
+Return ONLY a JSON array with no markdown formatting:
 [{ "word": "...", "pronunciation": "...", "definition": "...", "example": "...", "category": "Commonly Confused" | "Irregular Verbs" | "Phrasal Verbs" | "Idioms" }]`,
       messages: [{ role: "user", content: `Find difficult words in this article:\n\n${truncated}` }],
     });
     const block = msg.content.find((b) => b.type === "text");
-    if (!block || !("text" in block)) return BASE_DIFFICULT_WORDS;
-    const parsed = JSON.parse(block.text.trim());
+    if (!block || !("text" in block)) {
+      console.log("Difficult words: no text block found");
+      return BASE_DIFFICULT_WORDS;
+    }
+    console.log("Difficult words raw response:", block.text.slice(0, 300));
+    const parsed = parseJSON(block.text);
     return Array.isArray(parsed) ? parsed : BASE_DIFFICULT_WORDS;
-  } catch {
+  } catch (e) {
+    console.log("Difficult words parse error:", e);
     return BASE_DIFFICULT_WORDS;
   }
 }
@@ -267,6 +295,7 @@ export async function POST(request: NextRequest) {
 
     const resolvedText = articleText?.trim() ?? "";
     console.log("Resolved text length:", resolvedText.length);
+    console.log("API key present:", !!process.env.ANTHROPIC_API_KEY);
 
     const [summaryFromClaude, difficultWordsFromClaude, biasAnalysis, keyFactsFromClaude, reflectionQuestionsFromClaude] =
       await Promise.all([
