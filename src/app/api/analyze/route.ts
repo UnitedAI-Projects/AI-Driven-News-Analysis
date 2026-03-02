@@ -11,6 +11,24 @@ function looksLikeUrl(s: string): boolean {
 }
 
 async function fetchArticleTextFromUrl(url: string): Promise<{ text: string; title?: string }> {
+  // Try Firecrawl first
+  if (process.env.FIRECRAWL_API_KEY) {
+    try {
+      const FirecrawlApp = (await import("@mendable/firecrawl-js")).default;
+      const firecrawl = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
+      const result = await firecrawl.scrapeUrl(url, { formats: ["markdown"] });
+      if (result.success && result.markdown) {
+        return {
+          text: result.markdown.slice(0, 100000),
+          title: result.metadata?.title ?? undefined,
+        };
+      }
+    } catch (err) {
+      console.log("Firecrawl failed, falling back to direct fetch:", err);
+    }
+  }
+
+  // Fallback to direct fetch
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; NewSeries/1.0)" },
   });
@@ -115,7 +133,7 @@ async function getBiasAnalysisFromClaude(articleText: string): Promise<{ score: 
     const msg = await ANTHROPIC.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4096,
-      system: `You are a media bias analyst. Identify the top 5 most significant words or phrases in the article that show bias.
+      system: `You are a media bias analyst. Identify the TOP 5 most significant words or phrases in the article that show bias.
 For each flagged item return:
 - "text": the exact word or phrase from the article
 - "type": one of ["loaded_language", "opinion_as_fact", "unverified_claim", "framing_bias"]
@@ -296,6 +314,7 @@ export async function POST(request: NextRequest) {
     const resolvedText = articleText?.trim() ?? "";
     console.log("Resolved text length:", resolvedText.length);
     console.log("API key present:", !!process.env.ANTHROPIC_API_KEY);
+    console.log("Firecrawl key present:", !!process.env.FIRECRAWL_API_KEY);
 
     const [summaryFromClaude, difficultWordsFromClaude, biasAnalysis, keyFactsFromClaude, reflectionQuestionsFromClaude] =
       await Promise.all([

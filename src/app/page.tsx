@@ -128,7 +128,7 @@ function HomePageContent() {
        <Image src="/WWW.png" alt="NewSeries" width={300} height={90} />
        </div>
        <h1 className="font-serif text-4xl font-bold leading-tight md:text-5xl">
-       Built to help you understand how news is framed — not to tell you what to think.
+       Built to help you understand how news is framed!""
       </h1>
           <p className="mt-4 text-lg text-blueLight/90">
             NewSeries analyzes news articles for bias so you can read with clarity and confidence.
