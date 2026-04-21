@@ -3,18 +3,35 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
-type BiasSignal = {
-  title: string;
-  explanation: string;
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES - OPTION A (User-Friendly Names)
+// ═══════════════════════════════════════════════════════════════════════════
+
+type BiasType =
+  | "emotional_words"
+  | "one_sided"
+  | "opinion_as_fact"
+  | "missing_proof"
+  | "missing_context"
+  | "false_equivalence"
+  | "cherry_picking"
+  | "spin";
 
 type BiasFlag = {
   text: string;
-  type: "loaded_language" | "opinion_as_fact" | "unverified_claim" | "framing_bias";
+  type: BiasType;
   explanation: string;
+  confidence: number;
+  severity: "minor" | "moderate" | "major";
+  alternative?: string;
+  context?: string;
 };
 
-type DifficultWordCategory = "Commonly Confused" | "Irregular Verbs" | "Phrasal Verbs" | "Idioms";
+type DifficultWordCategory =
+  | "Political Terms"
+  | "Technical Terms"
+  | "Formal Language"
+  | "Domain-Specific";
 
 type WordFilter = "All Words" | DifficultWordCategory;
 
@@ -29,8 +46,9 @@ type DifficultWord = {
 type AnalysisResponse = {
   summary: string;
   biasScore: number;
-  biasSignals: BiasSignal[];
   biasFlagged?: BiasFlag[];
+  overallAssessment?: string;
+  dominantBias?: BiasType;
   keyFacts: string[];
   reflectionQuestions: string[];
   difficultWords: DifficultWord[];
@@ -38,34 +56,86 @@ type AnalysisResponse = {
   url?: string | null;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
 const WORD_FILTERS: { id: WordFilter; label: string }[] = [
   { id: "All Words", label: "All Words" },
-  { id: "Commonly Confused", label: "Commonly Confused" },
-  { id: "Irregular Verbs", label: "Irregular Verbs" },
-  { id: "Phrasal Verbs", label: "Phrasal Verbs" },
-  { id: "Idioms", label: "Idioms" },
+  { id: "Political Terms", label: "Political Terms" },
+  { id: "Technical Terms", label: "Technical Terms" },
+  { id: "Formal Language", label: "Formal Language" },
+  { id: "Domain-Specific", label: "Domain-Specific" },
 ];
 
 const categoryColorClasses: Record<DifficultWordCategory, string> = {
-  "Commonly Confused": "bg-blue-100 text-blue-900",
-  "Irregular Verbs": "bg-purple-100 text-purple-900",
-  "Phrasal Verbs": "bg-amber-100 text-amber-900",
-  Idioms: "bg-pink-100 text-pink-900",
+  "Political Terms": "bg-blue-100 text-blue-900",
+  "Technical Terms": "bg-purple-100 text-purple-900",
+  "Formal Language": "bg-amber-100 text-amber-900",
+  "Domain-Specific": "bg-pink-100 text-pink-900",
 };
 
-const biasBadgeColors: Record<BiasFlag["type"], string> = {
-  loaded_language: "bg-yellow-100 text-yellow-800 border border-yellow-300",
-  opinion_as_fact: "bg-orange-100 text-orange-800 border border-orange-300",
-  unverified_claim: "bg-red-100 text-red-800 border border-red-300",
-  framing_bias: "bg-blue-100 text-blue-800 border border-blue-300",
+// User-friendly bias type colors
+const BIAS_BADGE_COLORS: Record<BiasType, string> = {
+  emotional_words: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  one_sided: "bg-blue-100 text-blue-800 border-blue-300",
+  opinion_as_fact: "bg-orange-100 text-orange-800 border-orange-300",
+  missing_proof: "bg-red-100 text-red-800 border-red-300",
+  missing_context: "bg-purple-100 text-purple-800 border-purple-300",
+  false_equivalence: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  cherry_picking: "bg-pink-100 text-pink-800 border-pink-300",
+  spin: "bg-teal-100 text-teal-800 border-teal-300",
 };
 
-const biasTypeLabels: Record<BiasFlag["type"], string> = {
-  loaded_language: "Loaded Language",
+// User-friendly labels
+const BIAS_TYPE_LABELS: Record<BiasType, string> = {
+  emotional_words: "Emotional Words",
+  one_sided: "One-Sided",
   opinion_as_fact: "Opinion as Fact",
-  unverified_claim: "Unverified Claim",
-  framing_bias: "Framing Bias",
+  missing_proof: "Missing Proof",
+  missing_context: "Missing Context",
+  false_equivalence: "False Equivalence",
+  cherry_picking: "Cherry-Picking",
+  spin: "Spin",
 };
+
+// Simple descriptions anyone can understand
+const BIAS_TYPE_DESCRIPTIONS: Record<BiasType, string> = {
+  emotional_words: "Words chosen to make you feel a certain way",
+  one_sided: "Only showing one side of the story",
+  opinion_as_fact: "Treating personal opinions as proven facts",
+  missing_proof: "Making claims without showing evidence",
+  missing_context: "Leaving out important information that changes the meaning",
+  false_equivalence: "Treating two very different things as if they're the same",
+  cherry_picking: "Only mentioning facts that support one view",
+  spin: "Using softer or harsher words to change how something sounds",
+};
+
+// Severity colors
+const SEVERITY_COLORS: Record<BiasFlag["severity"], string> = {
+  minor: "bg-green-50 text-green-700 border-green-200",
+  moderate: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  major: "bg-red-50 text-red-700 border-red-200",
+};
+
+// Confidence helpers
+function getConfidenceLabel(confidence: number): string {
+  if (confidence >= 90) return "Very High";
+  if (confidence >= 75) return "High";
+  if (confidence >= 60) return "Moderate";
+  return "Low";
+}
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 90) return "text-green-600";
+  if (confidence >= 75) return "text-blue-600";
+  if (confidence >= 60) return "text-yellow-600";
+  return "text-gray-600";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
 
 function stripMarkdown(text: string): string {
   if (!text || typeof text !== "string") return text;
@@ -80,6 +150,10 @@ function stripMarkdown(text: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function ResultsPage() {
   const [meterWidth, setMeterWidth] = useState(0);
@@ -115,10 +189,13 @@ export default function ResultsPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="font-serif text-3xl font-bold text-deepBlue">Analysis Results</h1>
+    <div className="mx-auto max-w-4xl px-4 py-12">
+      <h1 className="font-serif text-3xl font-bold text-deepBlue">
+        Analysis Results
+      </h1>
       <p className="mt-1 text-deepBlue/70">
-        Explore how this article is framed and where you might look for additional context.
+        Explore how this article is framed and where you might look for
+        additional context.
       </p>
 
       {loading && (
@@ -148,15 +225,38 @@ export default function ResultsPage() {
 
       {!loading && analysis && (
         <>
-          {/* Summary */}
-          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
-            <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
-            <p className="mt-3 text-deepBlue/90 leading-relaxed">{stripMarkdown(analysis.summary)}</p>
-          </section>
+        {/* Summary */}
+        <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
+          <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
+  
+         {/* Render bullet points */}
+        <ul className="mt-3 space-y-2">
+        {analysis.summary
+          .split('\n')
+          .filter(line => line.trim().startsWith('-'))
+          .map((line, i) => (
+          <li key={i} className="flex gap-2 text-deepBlue/90 leading-relaxed">
+            <span className="text-green font-bold">•</span>
+            <span>{line.trim().substring(1).trim()}</span>
+          </li>
+        ))}
+      </ul>
 
+      {/* Source link if available */}
+      {analysis.url && (
+        <p className="mt-4 text-xs text-deepBlue/60">
+          Source:{" "}
+          <a href={analysis.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-green">
+            {analysis.url} 
+          </a>
+        </p>
+      )}
+      </section>
           {/* Bias Meter */}
           <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
-            <h2 className="font-serif text-xl font-bold text-deepBlue">Bias meter</h2>
+            <h2 className="font-serif text-xl font-bold text-deepBlue">
+              Bias meter
+            </h2>
             <div className="mt-3 flex items-center gap-4">
               <div className="relative h-8 w-full max-w-xs overflow-hidden rounded-full bg-deepBlue/20">
                 <div
@@ -171,57 +271,129 @@ export default function ResultsPage() {
             <p className="mt-1 text-sm text-deepBlue/70">
               Higher score = more neutral; lower = more biased.
             </p>
+
+            {/* Overall Assessment */}
+            {analysis.overallAssessment && (
+              <div className="mt-4 rounded-lg border border-deepBlue/10 bg-white/50 p-4">
+                <p className="text-sm font-medium text-deepBlue">
+                  Overall Assessment:
+                </p>
+                <p className="mt-1 text-sm text-deepBlue/80">
+                  {analysis.overallAssessment}
+                </p>
+              </div>
+            )}
+
+            {/* Dominant Bias Type */}
+            {analysis.dominantBias && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-sm font-medium text-deepBlue">
+                  Most Common Pattern:
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                    BIAS_BADGE_COLORS[analysis.dominantBias as BiasType]
+                  }`}
+                >
+                  {BIAS_TYPE_LABELS[analysis.dominantBias as BiasType]}
+                </span>
+              </div>
+            )}
           </section>
 
-          {/* Bias Flagged Words */}
+          {/* Bias Detected */}
           {analysis.biasFlagged && analysis.biasFlagged.length > 0 && (
             <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10">
-              <h2 className="font-serif text-xl font-bold text-deepBlue">Bias Detected</h2>
+              <h2 className="font-serif text-xl font-bold text-deepBlue">
+                Bias Detected
+              </h2>
               <p className="mt-1 text-sm text-deepBlue/70">
                 These words or phrases were flagged as potentially biased.
               </p>
 
-              {/* Legend */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
-                  <span className="rounded-full border border-yellow-300 bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">
-                    Loaded Language
-                  </span>
-                  <span className="text-xs text-deepBlue/70">Emotionally charged words to provoke a reaction</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
-                  <span className="rounded-full border border-blue-300 bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
-                    Framing Bias
-                  </span>
-                  <span className="text-xs text-deepBlue/70">Facts presented in a slanted or one-sided way</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
-                  <span className="rounded-full border border-orange-300 bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">
-                    Opinion as Fact
-                  </span>
-                  <span className="text-xs text-deepBlue/70">Personal opinions stated as verified truths</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-xl border border-green/10 bg-white/60 px-3 py-2">
-                  <span className="rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
-                    Unverified Claim
-                  </span>
-                  <span className="text-xs text-deepBlue/70">Statements presented as true without evidence</span>
-                </div>
+              {/* Legend - All 8 user-friendly types */}
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {Object.entries(BIAS_TYPE_LABELS).map(([type, label]) => (
+                  <div
+                    key={type}
+                    className="flex items-start gap-2 rounded-lg border border-green/10 bg-white/60 px-3 py-2"
+                  >
+                    <span
+                      className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                        BIAS_BADGE_COLORS[type as BiasType]
+                      }`}
+                    >
+                      {label}
+                    </span>
+                    <span className="text-xs text-deepBlue/70">
+                      {BIAS_TYPE_DESCRIPTIONS[type as BiasType]}
+                    </span>
+                  </div>
+                ))}
               </div>
 
-              {/* Flagged items */}
-              <ul className="mt-4 space-y-3">
+              {/* Flagged Items */}
+              <ul className="mt-6 space-y-4">
                 {analysis.biasFlagged.map((flag, i) => (
-                  <li key={i} className="rounded-xl border border-green/10 bg-white/70 p-4 shadow-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-deepBlue/10 px-2 py-1 font-semibold text-deepBlue text-sm">
+                  <li
+                    key={i}
+                    className="rounded-xl border border-green/10 bg-white/70 p-5 shadow-sm"
+                  >
+                    {/* Header with quoted text and badges */}
+                    <div className="flex flex-wrap items-start gap-2">
+                      <span className="flex-1 rounded-md bg-deepBlue/10 px-3 py-2 font-semibold text-deepBlue text-sm">
                         "{flag.text}"
                       </span>
-                      <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + biasBadgeColors[flag.type]}>
-                        {biasTypeLabels[flag.type]}
-                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                            BIAS_BADGE_COLORS[flag.type]
+                          }`}
+                        >
+                          {BIAS_TYPE_LABELS[flag.type]}
+                        </span>
+                        {/* Severity Badge */}
+                        <span
+                          className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                            SEVERITY_COLORS[flag.severity]
+                          }`}
+                        >
+                          {flag.severity.charAt(0).toUpperCase() +
+                            flag.severity.slice(1)}
+                        </span>
+                      </div>
                     </div>
-                    <p className="mt-2 text-sm text-deepBlue/80">{flag.explanation}</p>
+
+                    {/* Explanation */}
+                    <p className="mt-3 text-sm text-deepBlue/80">
+                      {flag.explanation}
+                    </p>
+
+                    {/* Alternative Phrasing */}
+                    {flag.alternative && (
+                      <div className="mt-3 rounded-lg border border-green/20 bg-greenBg/30 p-3">
+                        <p className="text-xs font-semibold text-green">
+                          💡 More neutral alternative:
+                        </p>
+                        <p className="mt-1 text-sm text-deepBlue">
+                          {flag.alternative}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Confidence & Severity Info */}
+                    <div className="mt-3 flex flex-wrap gap-4 text-xs">
+                      <div className="flex items-center gap-1">
+                        <span className="text-deepBlue/60">Confidence:</span>
+                        <span
+                          className={`font-semibold ${getConfidenceColor(
+                            flag.confidence
+                          )}`}
+                        >
+                          {getConfidenceLabel(flag.confidence)} ({flag.confidence}%)
+                        </span>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -230,7 +402,9 @@ export default function ResultsPage() {
 
           {/* Key Facts */}
           <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
-            <h2 className="font-serif text-xl font-bold text-deepBlue">Key facts</h2>
+            <h2 className="font-serif text-xl font-bold text-deepBlue">
+              Key facts
+            </h2>
             <ul className="mt-4 list-inside list-disc space-y-2 text-deepBlue/90">
               {analysis.keyFacts.map((fact, i) => (
                 <li key={i}>{fact}</li>
@@ -240,9 +414,12 @@ export default function ResultsPage() {
 
           {/* Think About It */}
           <section className="mt-8 rounded-xl border-2 border-green/40 bg-greenBg/80 p-6 shadow-glow-green">
-            <h2 className="font-serif text-xl font-bold text-deepBlue">Think About It</h2>
+            <h2 className="font-serif text-xl font-bold text-deepBlue">
+              Think About It
+            </h2>
             <p className="mt-2 text-deepBlue/80">
-              Use these questions to reflect on what you read and how it was presented.
+              Use these questions to reflect on what you read and how it was
+              presented.
             </p>
             <ul className="mt-4 space-y-2">
               {analysis.reflectionQuestions.map((q, i) => (
@@ -258,9 +435,12 @@ export default function ResultsPage() {
           <section className="mt-10 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="font-serif text-xl font-bold text-deepBlue">Difficult Words in This Article</h2>
+                <h2 className="font-serif text-xl font-bold text-deepBlue">
+                  Difficult Words in This Article
+                </h2>
                 <p className="mt-1 text-sm text-deepBlue/80">
-                  Learn key vocabulary from this article with simple meanings, pronunciation, and examples.
+                  Learn key vocabulary from this article with simple meanings,
+                  pronunciation, and examples.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -289,14 +469,18 @@ export default function ResultsPage() {
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {(activeFilter === "All Words"
                 ? analysis.difficultWords
-                : analysis.difficultWords.filter((word) => word.category === activeFilter)
+                : analysis.difficultWords.filter(
+                    (word) => word.category === activeFilter
+                  )
               ).map((word) => (
                 <article
                   key={word.word}
                   className="flex h-full flex-col rounded-xl border border-green/20 bg-white/70 p-4 shadow-sm"
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-lg font-semibold text-deepBlue">{word.word}</h3>
+                    <h3 className="text-lg font-semibold text-deepBlue">
+                      {word.word}
+                    </h3>
                     <span
                       className={
                         "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold " +
@@ -308,11 +492,18 @@ export default function ResultsPage() {
                   </div>
                   <p className="mt-1 text-xs uppercase tracking-wide text-deepBlue/60">
                     Pronunciation:{" "}
-                    <span className="font-semibold text-deepBlue/80">{word.pronunciation}</span>
+                    <span className="font-semibold text-deepBlue/80">
+                      {word.pronunciation}
+                    </span>
                   </p>
-                  <p className="mt-3 text-[15px] leading-relaxed text-deepBlue/90">{word.definition}</p>
+                  <p className="mt-3 text-[15px] leading-relaxed text-deepBlue/90">
+                    {word.definition}
+                  </p>
                   <p className="mt-3 text-sm text-deepBlue/80">
-                    <span className="font-semibold text-deepBlue">Example:</span> {word.example}
+                    <span className="font-semibold text-deepBlue">
+                      Example:
+                    </span>{" "}
+                    {word.example}
                   </p>
                 </article>
               ))}
