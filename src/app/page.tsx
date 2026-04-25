@@ -157,6 +157,13 @@ function HomePageContent() {
       if (typeof window !== "undefined") {
         try {
           sessionStorage.setItem("newseries-latest-analysis", JSON.stringify(data));
+          sessionStorage.setItem(
+            "newseries-latest-analysis-input",
+            JSON.stringify({
+              articleText: trimmedText,
+              url: trimmedUrl || (typeof data?.url === "string" ? data.url : ""),
+            }),
+          );
         } catch {
           // ignore storage errors
         }

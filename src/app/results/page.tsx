@@ -72,6 +72,13 @@ type HeadToHeadResponse = {
   verdict: string;
 };
 
+type ReadingLevel = "simple" | "normal" | "advanced";
+
+type AnalysisInput = {
+  articleText?: string;
+  url?: string;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -277,6 +284,10 @@ function ResultsPageContent() {
   const [headToHeadError, setHeadToHeadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [analysisInput, setAnalysisInput] = useState<AnalysisInput | null>(null);
+  const [readingLevel, setReadingLevel] = useState<ReadingLevel>("normal");
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -312,6 +323,13 @@ function ResultsPageContent() {
       }
       const parsed = JSON.parse(raw) as AnalysisResponse;
       setAnalysis(parsed);
+      const inputRaw = sessionStorage.getItem("newseries-latest-analysis-input");
+      if (inputRaw) {
+        const parsedInput = JSON.parse(inputRaw) as AnalysisInput;
+        setAnalysisInput(parsedInput);
+      } else {
+        setAnalysisInput({ articleText: "", url: parsed.url ?? "" });
+      }
       const targetScore = parsed.biasScore ?? 65;
       const clamped = Math.min(100, Math.max(0, targetScore));
       const t = requestAnimationFrame(() => {
@@ -326,6 +344,50 @@ function ResultsPageContent() {
       setLoading(false);
     }
   }, [compareMode]);
+
+  const handleReadingLevelChange = async (level: ReadingLevel) => {
+    if (!analysis || !analysisInput) return;
+
+    setReadingLevel(level);
+    setSummaryError(null);
+    setSummaryLoading(true);
+    try {
+      const response = await fetch("/api/summary-level", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          articleText: analysisInput.articleText ?? "",
+          url: analysisInput.url ?? analysis.url ?? "",
+          level,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to regenerate summary.");
+      }
+
+      const payload = (await response.json()) as { summary?: string };
+      if (!payload.summary || !payload.summary.trim()) {
+        throw new Error("Empty summary response.");
+      }
+
+      setAnalysis((prev) =>
+        prev
+          ? {
+              ...prev,
+              summary: payload.summary as string,
+            }
+          : prev,
+      );
+    } catch (err) {
+      console.error(err);
+      setSummaryError("Unable to regenerate summary for that reading level right now.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!compareMode || !comparison) return;
@@ -587,6 +649,33 @@ function ResultsPageContent() {
           {/* Summary */}
           <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
             <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                { id: "simple", label: "Simple" },
+                { id: "normal", label: "Normal" },
+                { id: "advanced", label: "Advanced" },
+              ].map((option) => {
+                const isActive = readingLevel === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    disabled={summaryLoading}
+                    onClick={() => handleReadingLevelChange(option.id as ReadingLevel)}
+                    className={
+                      "rounded-full px-4 py-1.5 text-sm font-medium border transition disabled:opacity-70 " +
+                      (isActive
+                        ? "border-green bg-gradient-to-r from-green to-greenLight text-white shadow-glow-green"
+                        : "border-deepBlue/15 bg-white/70 text-deepBlue/80 hover:border-green/70")
+                    }
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {summaryLoading && <p className="mt-3 text-sm text-deepBlue/70">Regenerating summary...</p>}
+            {summaryError && <p className="mt-3 text-sm text-red-700">{summaryError}</p>}
     
             {/* Add introductory paragraph */}
             <p className="mt-3 text-deepBlue/90 leading-relaxed">
