@@ -67,8 +67,9 @@ function defaultHeadToHead(payload: ComparePayload): HeadToHeadResponse {
 }
 
 export async function POST(request: NextRequest) {
+  let body: ComparePayload = {};
   try {
-    const body = (await request.json()) as ComparePayload;
+    body = (await request.json()) as ComparePayload;
     const fallback = defaultHeadToHead(body);
 
     if (!ANTHROPIC) {
@@ -113,7 +114,12 @@ Rules:
       return NextResponse.json(fallback);
     }
 
-    const parsed = parseJSON(block.text) as Partial<HeadToHeadResponse>;
+    let parsed: Partial<HeadToHeadResponse> = {};
+    try {
+      parsed = parseJSON(block.text) as Partial<HeadToHeadResponse>;
+    } catch {
+      return NextResponse.json(fallback);
+    }
 
     const result: HeadToHeadResponse = {
       moreBiasedArticle:
@@ -141,9 +147,6 @@ Rules:
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error in /api/compare:", error);
-    return NextResponse.json(
-      { error: "Unable to generate head-to-head analysis at this time." },
-      { status: 500 },
-    );
+    return NextResponse.json(defaultHeadToHead(body));
   }
 }

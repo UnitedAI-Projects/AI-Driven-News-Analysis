@@ -24,9 +24,7 @@ export default function Footer() {
             ))}
           </ul>
         </div>
-        <p className="mt-6 text-center text-sm text-blueLight/80">
-          © {new Date().getFullYear()} NewSeries. Visual preview only — no real analysis.
-        </p>
+        <p className="mt-6 text-center text-sm text-blueLight/80">© {new Date().getFullYear()} NewSeries.</p>
       </div>
     </footer>
   );

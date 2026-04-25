@@ -198,6 +198,36 @@ function splitSummary(summary: string): { intro: string; bullets: string[] } {
   };
 }
 
+function coerceStringList(value: unknown, fallback: string[]): string[] {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((item) => stripMarkdown(String(item))).filter(Boolean);
+    return cleaned.length ? cleaned : fallback;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return fallback;
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.map((item) => stripMarkdown(String(item))).filter(Boolean);
+        return cleaned.length ? cleaned : fallback;
+      }
+    } catch {
+      // Treat as plaintext list.
+    }
+
+    const splitByLine = trimmed
+      .split("\n")
+      .map((line) => line.replace(/^[-*]\s*/, "").trim())
+      .filter(Boolean);
+    return splitByLine.length ? splitByLine : [stripMarkdown(trimmed)];
+  }
+
+  return fallback;
+}
+
 function normalizeAnalysisResponse(raw: unknown): AnalysisResponse {
   const data = (raw ?? {}) as Partial<AnalysisResponse>;
   const url = typeof data.url === "string" ? data.url : null;
@@ -210,10 +240,7 @@ function normalizeAnalysisResponse(raw: unknown): AnalysisResponse {
     if (url) summary += ` (Source: ${url})`;
   }
 
-  const parsedKeyFacts =
-    Array.isArray(data.keyFacts) && data.keyFacts.length > 0
-      ? data.keyFacts.map((fact) => stripMarkdown(String(fact))).filter(Boolean)
-      : ["Could not extract key facts."];
+  const parsedKeyFacts = coerceStringList(data.keyFacts, ["Could not extract key facts."]);
 
   return {
     summary: stripMarkdown(summary),
@@ -223,9 +250,7 @@ function normalizeAnalysisResponse(raw: unknown): AnalysisResponse {
     dominantBias: data.dominantBias,
     keyFacts: parsedKeyFacts,
     reflectionQuestions:
-      Array.isArray(data.reflectionQuestions) && data.reflectionQuestions.length > 0
-        ? data.reflectionQuestions
-        : BASE_REFLECTION_QUESTIONS,
+      coerceStringList(data.reflectionQuestions, BASE_REFLECTION_QUESTIONS),
     difficultWords: Array.isArray(data.difficultWords) ? data.difficultWords : [],
     articleTitle: typeof data.articleTitle === "string" ? data.articleTitle : null,
     url,
@@ -262,10 +287,14 @@ function ResultsPageContent() {
           setLoading(false);
           return;
         }
-        const parsedComparison = JSON.parse(rawComparison) as Partial<ComparisonResponse>;
+        const parsedComparison = JSON.parse(rawComparison) as
+          | Partial<ComparisonResponse>
+          | { articleA?: unknown; articleB?: unknown };
+        const leftRaw = "left" in parsedComparison ? parsedComparison.left : parsedComparison.articleA;
+        const rightRaw = "right" in parsedComparison ? parsedComparison.right : parsedComparison.articleB;
         setComparison({
-          left: normalizeAnalysisResponse(parsedComparison?.left),
-          right: normalizeAnalysisResponse(parsedComparison?.right),
+          left: normalizeAnalysisResponse(leftRaw),
+          right: normalizeAnalysisResponse(rightRaw),
         });
         setLoading(false);
         return;
