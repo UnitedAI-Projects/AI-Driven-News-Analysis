@@ -287,11 +287,9 @@ function ResultsPageContent() {
           setLoading(false);
           return;
         }
-        const parsedComparison = JSON.parse(rawComparison) as
-          | Partial<ComparisonResponse>
-          | { articleA?: unknown; articleB?: unknown };
-        const leftRaw = "left" in parsedComparison ? parsedComparison.left : parsedComparison.articleA;
-        const rightRaw = "right" in parsedComparison ? parsedComparison.right : parsedComparison.articleB;
+        const parsedComparison = JSON.parse(rawComparison) as Record<string, unknown>;
+        const leftRaw = parsedComparison.left ?? parsedComparison.articleA;
+        const rightRaw = parsedComparison.right ?? parsedComparison.articleB;
         setComparison({
           left: normalizeAnalysisResponse(leftRaw),
           right: normalizeAnalysisResponse(rightRaw),
