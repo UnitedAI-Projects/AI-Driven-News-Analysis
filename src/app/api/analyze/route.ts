@@ -17,7 +17,7 @@ async function fetchArticleTextFromUrl(url: string): Promise<{ text: string; tit
       const FirecrawlApp = (await import("@mendable/firecrawl-js")).default;
       const firecrawl = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
       const result = await firecrawl.scrape(url, { formats: ["markdown"] });
-      if (result.success && result.markdown) {
+      if (result && result.markdown) {
         return {
           text: result.markdown.slice(0, 100000),
           title: result.metadata?.title ?? undefined,
