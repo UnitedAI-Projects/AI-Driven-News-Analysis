@@ -111,6 +111,14 @@ const BIAS_TYPE_DESCRIPTIONS: Record<BiasType, string> = {
   spin: "Using softer or harsher words to change how something sounds",
 };
 
+// Category descriptions for tooltips
+const CATEGORY_DESCRIPTIONS: Record<DifficultWordCategory, string> = {
+  "Political Terms": "Government, policy, diplomacy, and political vocabulary used in news coverage",
+  "Technical Terms": "Specialized vocabulary specific to the article's domain (medical, legal, economic, scientific, etc.)",
+  "Formal Language": "Academic, professional, or elevated vocabulary used in formal writing",
+  "Domain-Specific": "Topic-specific terminology unique to this particular story's subject matter",
+};
+
 // Severity colors
 const SEVERITY_COLORS: Record<BiasFlag["severity"], string> = {
   minor: "bg-green-50 text-green-700 border-green-200",
@@ -158,6 +166,9 @@ function stripMarkdown(text: string): string {
 export default function ResultsPage() {
   const [meterWidth, setMeterWidth] = useState(0);
   const [activeFilter, setActiveFilter] = useState<WordFilter>("All Words");
+  const [showBiasInfo, setShowBiasInfo] = useState(false);
+  const [showAllBias, setShowAllBias] = useState(false);
+  const [showCategoryInfo, setShowCategoryInfo] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -225,33 +236,54 @@ export default function ResultsPage() {
 
       {!loading && analysis && (
         <>
-        {/* Summary */}
-        <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
-          <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
-  
-         {/* Render bullet points */}
-        <ul className="mt-3 space-y-2">
-        {analysis.summary
-          .split('\n')
-          .filter(line => line.trim().startsWith('-'))
-          .map((line, i) => (
-          <li key={i} className="flex gap-2 text-deepBlue/90 leading-relaxed">
-            <span className="text-green font-bold">•</span>
-            <span>{line.trim().substring(1).trim()}</span>
-          </li>
-        ))}
-      </ul>
+          {/* Summary */}
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
+    
+            {/* Add introductory paragraph */}
+            <p className="mt-3 text-deepBlue/90 leading-relaxed">
+              {analysis.summary
+                .split('\n')
+                .filter(line => !line.trim().startsWith('-') && line.trim().length > 0)
+                .join(' ')}
+            </p>
+    
+            {/* Render bullet points */}
+            <ul className="mt-4 space-y-2">
+              {analysis.summary
+                .split('\n')
+                .filter(line => line.trim().startsWith('-'))
+                .map((line, i) => (
+                  <li key={i} className="flex gap-2 text-deepBlue/90 leading-relaxed">
+                    <span className="text-green font-bold">•</span>
+                    <span>{line.trim().substring(1).trim()}</span>
+                  </li>
+                ))}
+            </ul>
 
-      {/* Source link if available */}
-      {analysis.url && (
-        <p className="mt-4 text-xs text-deepBlue/60">
-          Source:{" "}
-          <a href={analysis.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-green">
-            {analysis.url} 
-          </a>
-        </p>
-      )}
-      </section>
+            {/* Source link if available */}
+            {analysis.url && (
+              <p className="mt-4 text-xs text-deepBlue/60">
+                Source:{" "}
+                <a href={analysis.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-green">
+                  {analysis.url} 
+                </a>
+              </p>
+            )}
+          </section>
+
+          {/* Key Facts */}
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+            <h2 className="font-serif text-xl font-bold text-deepBlue">
+              Key Facts
+            </h2>
+            <ul className="mt-4 list-inside list-disc space-y-2 text-deepBlue/90">
+              {analysis.keyFacts.map((fact, i) => (
+                <li key={i}>{fact}</li>
+              ))}
+            </ul>
+          </section>
+
           {/* Bias Meter */}
           <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
             <h2 className="font-serif text-xl font-bold text-deepBlue">
@@ -260,8 +292,15 @@ export default function ResultsPage() {
             <div className="mt-3 flex items-center gap-4">
               <div className="relative h-8 w-full max-w-xs overflow-hidden rounded-full bg-deepBlue/20">
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-green to-greenLight shadow-glow-green transition-all duration-1000 ease-out"
-                  style={{ width: `${meterWidth}%` }}
+                  className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000 ease-out"
+                  style={{ 
+                    width: `${meterWidth}%`,
+                    background: meterWidth > 70 
+                      ? 'linear-gradient(to right, #ef4444, #f97316)' 
+                      : meterWidth > 40 
+                      ? 'linear-gradient(to right, #f59e0b, #eab308)' 
+                      : 'linear-gradient(to right, #10b981, #34d399)'
+                  }}
                 />
               </div>
               <span className="font-serif text-2xl font-bold text-deepBlue">
@@ -269,7 +308,7 @@ export default function ResultsPage() {
               </span>
             </div>
             <p className="mt-1 text-sm text-deepBlue/70">
-              Higher score = more neutral; lower = more biased.
+              Higher score = more biased; lower score = more neutral.
             </p>
 
             {/* Overall Assessment */}
@@ -304,37 +343,57 @@ export default function ResultsPage() {
           {/* Bias Detected */}
           {analysis.biasFlagged && analysis.biasFlagged.length > 0 && (
             <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10">
-              <h2 className="font-serif text-xl font-bold text-deepBlue">
-                Bias Detected
-              </h2>
-              <p className="mt-1 text-sm text-deepBlue/70">
+              <div className="flex items-center gap-2">
+                <h2 className="font-serif text-xl font-bold text-deepBlue">
+                  Bias Detected
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowBiasInfo(!showBiasInfo)}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-deepBlue/10 text-deepBlue hover:bg-deepBlue/20 transition"
+                  aria-label="Learn about bias types"
+                >
+                  <span className="text-sm font-bold">?</span>
+                </button>
+              </div>
+
+              {/* Tooltip */}
+              {showBiasInfo && (
+                <div className="mt-4 rounded-lg border-2 border-deepBlue/20 bg-white/90 p-4 shadow-lg">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="font-semibold text-deepBlue">Understanding Bias Types</h3>
+                    <button
+                      onClick={() => setShowBiasInfo(false)}
+                      className="text-deepBlue/60 hover:text-deepBlue text-lg font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-sm text-deepBlue/80 mb-3">
+                    We look for 8 common patterns of bias in news articles:
+                  </p>
+                  <div className="grid gap-2 text-sm">
+                    {Object.entries(BIAS_TYPE_LABELS).map(([type, label]) => (
+                      <div key={type} className="flex gap-2">
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${BIAS_BADGE_COLORS[type as BiasType]}`}>
+                          {label}
+                        </span>
+                        <span className="text-xs text-deepBlue/70">
+                          {BIAS_TYPE_DESCRIPTIONS[type as BiasType]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-4 text-sm text-deepBlue/70">
                 These words or phrases were flagged as potentially biased.
               </p>
 
-              {/* Legend - All 8 user-friendly types */}
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {Object.entries(BIAS_TYPE_LABELS).map(([type, label]) => (
-                  <div
-                    key={type}
-                    className="flex items-start gap-2 rounded-lg border border-green/10 bg-white/60 px-3 py-2"
-                  >
-                    <span
-                      className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                        BIAS_BADGE_COLORS[type as BiasType]
-                      }`}
-                    >
-                      {label}
-                    </span>
-                    <span className="text-xs text-deepBlue/70">
-                      {BIAS_TYPE_DESCRIPTIONS[type as BiasType]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
               {/* Flagged Items */}
               <ul className="mt-6 space-y-4">
-                {analysis.biasFlagged.map((flag, i) => (
+                {(showAllBias ? analysis.biasFlagged : analysis.biasFlagged.slice(0, 3)).map((flag, i) => (
                   <li
                     key={i}
                     className="rounded-xl border border-green/10 bg-white/70 p-5 shadow-sm"
@@ -397,20 +456,21 @@ export default function ResultsPage() {
                   </li>
                 ))}
               </ul>
+
+              {/* See More/Less Button */}
+              {analysis.biasFlagged.length > 3 && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllBias(!showAllBias)}
+                    className="rounded-full border-2 border-green bg-white px-6 py-2 text-sm font-semibold text-deepBlue transition hover:bg-green/10"
+                  >
+                    {showAllBias ? '⬆ See Less' : `⬇ See More (${analysis.biasFlagged.length - 3} more)`}
+                  </button>
+                </div>
+              )}
             </section>
           )}
-
-          {/* Key Facts */}
-          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
-            <h2 className="font-serif text-xl font-bold text-deepBlue">
-              Key facts
-            </h2>
-            <ul className="mt-4 list-inside list-disc space-y-2 text-deepBlue/90">
-              {analysis.keyFacts.map((fact, i) => (
-                <li key={i}>{fact}</li>
-              ))}
-            </ul>
-          </section>
 
           {/* Think About It */}
           <section className="mt-8 rounded-xl border-2 border-green/40 bg-greenBg/80 p-6 shadow-glow-green">
@@ -435,14 +495,53 @@ export default function ResultsPage() {
           <section className="mt-10 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="font-serif text-xl font-bold text-deepBlue">
-                  Difficult Words in This Article
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-serif text-xl font-bold text-deepBlue">
+                    Difficult Words in This Article
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryInfo(!showCategoryInfo)}
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-deepBlue/10 text-deepBlue hover:bg-deepBlue/20 transition"
+                    aria-label="Learn about word categories"
+                  >
+                    <span className="text-sm font-bold">?</span>
+                  </button>
+                </div>
+
+                {/* Category Tooltip */}
+                {showCategoryInfo && (
+                  <div className="mt-3 rounded-lg border-2 border-deepBlue/20 bg-white/90 p-4 shadow-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="font-semibold text-deepBlue">Understanding Word Categories</h3>
+                      <button
+                        onClick={() => setShowCategoryInfo(false)}
+                        className="text-deepBlue/60 hover:text-deepBlue text-lg font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="grid gap-2 text-sm">
+                      {Object.entries(CATEGORY_DESCRIPTIONS).map(([category, description]) => (
+                        <div key={category} className="flex gap-2">
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${categoryColorClasses[category as DifficultWordCategory]}`}>
+                            {category}
+                          </span>
+                          <span className="text-xs text-deepBlue/70">
+                            {description}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <p className="mt-1 text-sm text-deepBlue/80">
                   Learn key vocabulary from this article with simple meanings,
                   pronunciation, and examples.
                 </p>
               </div>
+
               <div className="flex flex-wrap gap-2">
                 {WORD_FILTERS.map((filter) => {
                   const isActive = activeFilter === filter.id;

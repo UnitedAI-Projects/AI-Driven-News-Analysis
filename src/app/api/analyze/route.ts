@@ -121,23 +121,31 @@ async function getSummaryFromClaude(articleText: string): Promise<string | null>
     const msg = await ANTHROPIC.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
-      system: `You are a concise news summarizer. Create a bullet-point summary of the article with 4-6 key points.
- 
-## REQUIREMENTS:
-- Each bullet point should be ONE clear, factual sentence
+      system: `You are a concise news summarizer. Create a summary with TWO parts:
+
+## PART 1 - OVERVIEW PARAGRAPH:
+Write 2-3 sentences that give a high-level overview of the main story and its significance.
+
+## PART 2 - KEY POINTS (BULLETS):
+Provide 4-6 detailed bullet points covering the main facts.
+- Each bullet should be ONE clear, factual sentence
 - Focus on: who, what, when, where, why
 - Use neutral, objective language
-- No opinions, interpretations, or bias discussion
+- No opinions or bias discussion
 - Start each point with a dash (-)
- 
-## FORMAT:
-Return bullets as plain text, one per line, starting with "-"
- 
-Example output:
-- [First key fact about the event]
-- [Second key fact about people involved]
-- [Third key fact about the outcome]
-- [Fourth key fact about context or implications]`,
+
+## FORMAT REQUIREMENTS:
+1. Start with the paragraph (2-3 sentences)
+2. Add ONE blank line
+3. Then add bullet points (each starting with "-")
+
+## EXAMPLE OUTPUT:
+The Iran-U.S. conflict has effectively shut down commercial shipping through the Strait of Hormuz, creating a global shipping crisis. Companies are now paying unprecedented premiums to secure alternative routes through the Panama Canal.
+
+- Companies are paying up to $4 million for last-minute Panama Canal crossing slots as the conflict has disrupted normal shipping routes
+- The Panama Canal normally charges $300,000-$400,000 per crossing, but prices have surged to approximately $425,000
+- One unnamed fuel company paid an extra $4 million to reroute its vessel from Europe to Singapore
+- Brent crude oil prices briefly exceeded $107 per barrel this week, up from approximately $66 a year ago`,
       messages: [{ role: "user", content: `Summarize this article:\n\n${truncated}` }],
     });
     const block = msg.content.find((b) => b.type === "text");
@@ -295,8 +303,11 @@ Return ONLY valid JSON with no markdown formatting:
 
     console.log(`Bias analysis: score=${score}, flagged=${flagged.length} items`);
 
+    // Reverse the score so higher = more biased
+    const reversedScore = 100 - score;
+
     return {
-      score,
+      score: reversedScore,
       flagged,
       overallAssessment,
       dominantBias,
@@ -342,7 +353,26 @@ async function getReflectionQuestionsFromClaude(articleText: string): Promise<st
     const msg = await ANTHROPIC.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 512,
-      system: `You are a critical thinking educator. Generate exactly 4 thought-provoking questions about this specific article. Every question must reference specific details, people, or events from the article. Do NOT write generic questions. Return ONLY a JSON array of 4 strings with no markdown formatting.`,
+      system: `You are a critical thinking educator for high school students. Generate exactly 4 SHORT, simple questions about this article. 
+
+      REQUIREMENTS:
+      - Each question should be 10-15 words maximum
+      - Use simple, everyday language (avoid academic jargon)
+      - Ask questions that make readers think critically but aren't overwhelming
+      - Reference specific details from the article when possible
+      - Focus on: who benefits, what's missing, source credibility, and alternative perspectives
+
+      GOOD EXAMPLES:
+      - "Who might benefit from this story being told this way?"
+      - "What viewpoints are missing from this article?"
+      - "Are all the claims backed up with evidence?"
+      - "How might the 'other side' describe this situation?"
+
+      BAD EXAMPLES (too long/complex):
+      - "Canal Administrator Ricaurte Vásquez revealed that one unnamed fuel vessel paid an extra $4 million to reroute to Singapore because 'Singapore is running out of fuel' — what does this suggest about how regional fuel crises can create cascading economic pressure points that force companies into extraordinarily costly last-minute decisions?"
+
+Return ONLY a JSON array of 4 strings with no markdown formatting.`,
+
       messages: [{ role: "user", content: `Generate 4 critical thinking questions:\n\n${truncated}` }],
     });
     const block = msg.content.find((b) => b.type === "text");
