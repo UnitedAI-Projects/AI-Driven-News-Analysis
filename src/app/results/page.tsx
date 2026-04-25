@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -181,7 +181,7 @@ function splitSummary(summary: string): { intro: string; bullets: string[] } {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export default function ResultsPage() {
+function ResultsPageContent() {
   const searchParams = useSearchParams();
   const compareMode = searchParams.get("compare") === "1";
   const [meterWidth, setMeterWidth] = useState(0);
@@ -767,5 +767,13 @@ export default function ResultsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[50vh] bg-blueLight" />}>
+      <ResultsPageContent />
+    </Suspense>
   );
 }
