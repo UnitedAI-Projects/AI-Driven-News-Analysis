@@ -54,6 +54,8 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const [articleText, setArticleText] = useState("");
   const [url, setUrl] = useState("");
+  const [compareUrlA, setCompareUrlA] = useState("");
+  const [compareUrlB, setCompareUrlB] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,6 +113,72 @@ function HomePageContent() {
       }
 
       router.push("/results");
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const trimmedUrlA = compareUrlA.trim();
+    const trimmedUrlB = compareUrlB.trim();
+
+    if (!trimmedUrlA || !trimmedUrlB) {
+      setError("Please enter both article URLs to compare.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const [responseA, responseB] = await Promise.all([
+        fetch("/api/analyze", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url: trimmedUrlA }),
+        }),
+        fetch("/api/analyze", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url: trimmedUrlB }),
+        }),
+      ]);
+
+      if (!responseA.ok || !responseB.ok) {
+        throw new Error("Failed to compare articles. Please check both URLs and try again.");
+      }
+
+      const [dataA, dataB] = await Promise.all([responseA.json(), responseB.json()]);
+
+      const titleA = typeof dataA?.articleTitle === "string" && dataA.articleTitle.trim() ? dataA.articleTitle.trim() : undefined;
+      const titleB = typeof dataB?.articleTitle === "string" && dataB.articleTitle.trim() ? dataB.articleTitle.trim() : undefined;
+
+      saveToHistory(trimmedUrlA, titleA);
+      saveToHistory(trimmedUrlB, titleB);
+
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            "newseries-latest-comparison",
+            JSON.stringify({
+              left: dataA,
+              right: dataB,
+            })
+          );
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      router.push("/results?compare=1");
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -212,6 +280,48 @@ function HomePageContent() {
               )}
             </button>
           </form>
+
+          <div className="mt-10 rounded-xl border border-green/20 bg-white/50 p-6">
+            <h3 className="font-serif text-2xl font-bold text-deepBlue">Compare Two Articles</h3>
+            <p className="mt-2 text-deepBlue/80">
+              Enter two article URLs to analyze framing side by side.
+            </p>
+            <form onSubmit={handleCompare} className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="compare-url-a" className="block font-medium text-deepBlue">
+                  First article URL
+                </label>
+                <input
+                  id="compare-url-a"
+                  type="url"
+                  placeholder="https://example.com/article-one"
+                  value={compareUrlA}
+                  onChange={(e) => setCompareUrlA(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-green/30 bg-blueLight/80 px-4 py-3 text-deepBlue placeholder:text-deepBlue/50 focus:border-green focus:outline-none focus:ring-2 focus:ring-green/30"
+                />
+              </div>
+              <div>
+                <label htmlFor="compare-url-b" className="block font-medium text-deepBlue">
+                  Second article URL
+                </label>
+                <input
+                  id="compare-url-b"
+                  type="url"
+                  placeholder="https://example.com/article-two"
+                  value={compareUrlB}
+                  onChange={(e) => setCompareUrlB(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-green/30 bg-blueLight/80 px-4 py-3 text-deepBlue placeholder:text-deepBlue/50 focus:border-green focus:outline-none focus:ring-2 focus:ring-green/30"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-full border-2 border-green bg-white py-4 font-semibold text-deepBlue transition hover:bg-green/10 disabled:opacity-70"
+              >
+                {loading ? "Comparing..." : "Compare Articles"}
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 

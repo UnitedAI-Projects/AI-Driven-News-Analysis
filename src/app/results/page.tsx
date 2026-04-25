@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES - OPTION A (User-Friendly Names)
@@ -54,6 +55,11 @@ type AnalysisResponse = {
   difficultWords: DifficultWord[];
   articleTitle?: string | null;
   url?: string | null;
+};
+
+type ComparisonResponse = {
+  left: AnalysisResponse;
+  right: AnalysisResponse;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -159,23 +165,51 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
+function splitSummary(summary: string): { intro: string; bullets: string[] } {
+  const lines = summary.split("\n");
+  return {
+    intro: lines
+      .filter((line) => !line.trim().startsWith("-") && line.trim().length > 0)
+      .join(" "),
+    bullets: lines
+      .filter((line) => line.trim().startsWith("-"))
+      .map((line) => line.trim().substring(1).trim()),
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function ResultsPage() {
+  const searchParams = useSearchParams();
+  const compareMode = searchParams.get("compare") === "1";
   const [meterWidth, setMeterWidth] = useState(0);
   const [activeFilter, setActiveFilter] = useState<WordFilter>("All Words");
   const [showBiasInfo, setShowBiasInfo] = useState(false);
   const [showAllBias, setShowAllBias] = useState(false);
   const [showCategoryInfo, setShowCategoryInfo] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      if (compareMode) {
+        const rawComparison = sessionStorage.getItem("newseries-latest-comparison");
+        if (!rawComparison) {
+          setError("No recent comparison found. Please compare two articles first.");
+          setLoading(false);
+          return;
+        }
+        const parsedComparison = JSON.parse(rawComparison) as ComparisonResponse;
+        setComparison(parsedComparison);
+        setLoading(false);
+        return;
+      }
+
       const raw = sessionStorage.getItem("newseries-latest-analysis");
       if (!raw) {
         setError("No recent analysis found. Please analyze an article first.");
@@ -197,16 +231,17 @@ export default function ResultsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [compareMode]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
       <h1 className="font-serif text-3xl font-bold text-deepBlue">
-        Analysis Results
+        {compareMode ? "Comparison Results" : "Analysis Results"}
       </h1>
       <p className="mt-1 text-deepBlue/70">
-        Explore how this article is framed and where you might look for
-        additional context.
+        {compareMode
+          ? "Compare how each article is framed side by side."
+          : "Explore how this article is framed and where you might look for additional context."}
       </p>
 
       {loading && (
@@ -228,13 +263,125 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {!loading && !error && !analysis && (
+      {!loading && !error && !compareMode && !analysis && (
         <div className="mt-6 rounded-xl border border-green/20 bg-blueLight/60 p-4 text-deepBlue/80">
           <p>No analysis data found. Please analyze an article first.</p>
         </div>
       )}
 
-      {!loading && analysis && (
+      {!loading && !error && compareMode && comparison && (
+        <>
+          <section className="mt-8 grid gap-6 lg:grid-cols-2">
+            {[comparison.left, comparison.right].map((item, index) => {
+              const summary = splitSummary(item.summary ?? "");
+              const score = Math.min(100, Math.max(0, item.biasScore ?? 0));
+              return (
+                <article
+                  key={index}
+                  className="rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10"
+                >
+                  <h2 className="font-serif text-xl font-bold text-deepBlue">
+                    {index === 0 ? "Article A" : "Article B"}
+                  </h2>
+                  {item.articleTitle && (
+                    <p className="mt-2 text-sm font-semibold text-deepBlue/90">
+                      {item.articleTitle}
+                    </p>
+                  )}
+                  {item.url && (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 block truncate text-xs text-deepBlue/70 underline hover:text-green"
+                    >
+                      {item.url}
+                    </a>
+                  )}
+
+                  <div className="mt-5">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-deepBlue/70">
+                      Summary
+                    </h3>
+                    {summary.intro && (
+                      <p className="mt-2 text-sm leading-relaxed text-deepBlue/90">
+                        {summary.intro}
+                      </p>
+                    )}
+                    {summary.bullets.length > 0 && (
+                      <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-deepBlue/90">
+                        {summary.bullets.map((bullet, bulletIndex) => (
+                          <li key={bulletIndex}>{bullet}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="mt-5">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-deepBlue/70">
+                      Bias Score
+                    </h3>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="relative h-6 w-full overflow-hidden rounded-full bg-deepBlue/20">
+                        <div
+                          className="absolute left-0 top-0 h-full rounded-full"
+                          style={{
+                            width: `${score}%`,
+                            background:
+                              score > 70
+                                ? "linear-gradient(to right, #ef4444, #f97316)"
+                                : score > 40
+                                  ? "linear-gradient(to right, #f59e0b, #eab308)"
+                                  : "linear-gradient(to right, #10b981, #34d399)",
+                          }}
+                        />
+                      </div>
+                      <span className="font-serif text-lg font-bold text-deepBlue">{score}/100</span>
+                    </div>
+                  </div>
+
+                  {item.keyFacts?.length > 0 && (
+                    <div className="mt-5">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-deepBlue/70">
+                        Key Facts
+                      </h3>
+                      <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-deepBlue/90">
+                        {item.keyFacts.slice(0, 5).map((fact, factIndex) => (
+                          <li key={factIndex}>{fact}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {item.dominantBias && (
+                    <div className="mt-5 flex items-center gap-2">
+                      <span className="text-sm font-medium text-deepBlue/80">Most Common Pattern:</span>
+                      <span
+                        className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                          BIAS_BADGE_COLORS[item.dominantBias]
+                        }`}
+                      >
+                        {BIAS_TYPE_LABELS[item.dominantBias]}
+                      </span>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </section>
+
+          <div className="mt-10 text-center">
+            <Link
+              href="/#analyze"
+              className="inline-block rounded-full bg-gradient-to-r from-green to-greenLight px-8 py-4 font-semibold text-white shadow-glow-green transition hover:shadow-glow-green-lg"
+            >
+              Compare More Articles
+            </Link>
+          </div>
+        </>
+      )}
+
+      {!loading && !compareMode && analysis && (
         <>
           {/* Summary */}
           <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
