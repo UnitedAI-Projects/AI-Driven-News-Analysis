@@ -6,6 +6,8 @@ const ANTHROPIC = process.env.ANTHROPIC_API_KEY
   : null;
 
 type ComparePayload = {
+  urlA?: string;
+  urlB?: string;
   articleA?: {
     summary?: string;
     biasScore?: number;
@@ -70,6 +72,33 @@ export async function POST(request: NextRequest) {
   let body: ComparePayload = {};
   try {
     body = (await request.json()) as ComparePayload;
+    const urlA = typeof body.urlA === "string" ? body.urlA.trim() : "";
+    const urlB = typeof body.urlB === "string" ? body.urlB.trim() : "";
+
+    if ((!body.articleA || !body.articleB) && urlA && urlB) {
+      const baseUrl = request.nextUrl.origin;
+      const [analyzeARes, analyzeBRes] = await Promise.all([
+        fetch(`${baseUrl}/api/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: urlA }),
+          cache: "no-store",
+        }),
+        fetch(`${baseUrl}/api/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: urlB }),
+          cache: "no-store",
+        }),
+      ]);
+
+      if (analyzeARes.ok && analyzeBRes.ok) {
+        const [articleA, articleB] = await Promise.all([analyzeARes.json(), analyzeBRes.json()]);
+        body.articleA = articleA;
+        body.articleB = articleB;
+      }
+    }
+
     const fallback = defaultHeadToHead(body);
 
     if (!ANTHROPIC) {

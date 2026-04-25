@@ -39,6 +39,15 @@ type HistoryItem = {
   timestamp: string;
 };
 
+type ComparisonHeadToHead = {
+  moreBiasedArticle: "A" | "B" | "Tie";
+  biasDifference: number;
+  toneComparison: string;
+  uniqueFactsA: string[];
+  uniqueFactsB: string[];
+  verdict: string;
+};
+
 function saveToHistory(url: string, title?: string | null) {
   if (!url || !url.trim()) return;
   try {
@@ -47,6 +56,45 @@ function saveToHistory(url: string, title?: string | null) {
     list.unshift({ url: url.trim(), title: title?.trim() || undefined, timestamp: new Date().toISOString() });
     localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 100)));
   } catch (_) {}
+}
+
+function coerceStringList(value: unknown, fallback: string[]): string[] {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((item) => String(item).trim()).filter(Boolean);
+    return cleaned.length ? cleaned : fallback;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return fallback;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.map((item) => String(item).trim()).filter(Boolean);
+        return cleaned.length ? cleaned : fallback;
+      }
+    } catch {
+      // Continue with plain-text parsing.
+    }
+    const lines = trimmed
+      .split("\n")
+      .map((line) => line.replace(/^[-*]\s*/, "").trim())
+      .filter(Boolean);
+    return lines.length ? lines : [trimmed];
+  }
+  return fallback;
+}
+
+function normalizeAnalyzeResponse(data: any, urlFallback: string) {
+  const summary = typeof data?.summary === "string" && data.summary.trim()
+    ? data.summary.trim()
+    : `We couldn't generate a short summary for this article. (Source: ${urlFallback})`;
+  const keyFacts = coerceStringList(data?.keyFacts, ["Could not extract key facts."]);
+  return {
+    ...data,
+    summary,
+    keyFacts,
+    url: typeof data?.url === "string" && data.url.trim() ? data.url : urlFallback,
+  };
 }
 
 function HomePageContent() {
@@ -135,7 +183,18 @@ function HomePageContent() {
 
     setLoading(true);
     try {
-      const [responseA, responseB] = await Promise.all([
+      const compareRequest = fetch("/api/compare", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          urlA: trimmedUrlA,
+          urlB: trimmedUrlB,
+        }),
+      });
+
+      const [responseA, responseB, compareResponse] = await Promise.all([
         fetch("/api/analyze", {
           method: "POST",
           headers: {
@@ -150,13 +209,20 @@ function HomePageContent() {
           },
           body: JSON.stringify({ url: trimmedUrlB }),
         }),
+        compareRequest,
       ]);
 
-      if (!responseA.ok || !responseB.ok) {
+      if (!responseA.ok || !responseB.ok || !compareResponse.ok) {
         throw new Error("Failed to compare articles. Please check both URLs and try again.");
       }
 
-      const [dataA, dataB] = await Promise.all([responseA.json(), responseB.json()]);
+      const [rawDataA, rawDataB, headToHead] = await Promise.all([
+        responseA.json(),
+        responseB.json(),
+        compareResponse.json(),
+      ]);
+      const dataA = normalizeAnalyzeResponse(rawDataA, trimmedUrlA);
+      const dataB = normalizeAnalyzeResponse(rawDataB, trimmedUrlB);
 
       const titleA = typeof dataA?.articleTitle === "string" && dataA.articleTitle.trim() ? dataA.articleTitle.trim() : undefined;
       const titleB = typeof dataB?.articleTitle === "string" && dataB.articleTitle.trim() ? dataB.articleTitle.trim() : undefined;
@@ -171,6 +237,7 @@ function HomePageContent() {
             JSON.stringify({
               left: dataA,
               right: dataB,
+              headToHead: headToHead as ComparisonHeadToHead,
             })
           );
         } catch {

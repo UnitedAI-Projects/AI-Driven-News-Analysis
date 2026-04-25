@@ -60,6 +60,7 @@ type AnalysisResponse = {
 type ComparisonResponse = {
   left: AnalysisResponse;
   right: AnalysisResponse;
+  headToHead?: HeadToHeadResponse;
 };
 
 type HeadToHeadResponse = {
@@ -290,10 +291,15 @@ function ResultsPageContent() {
         const parsedComparison = JSON.parse(rawComparison) as Record<string, unknown>;
         const leftRaw = parsedComparison.left ?? parsedComparison.articleA;
         const rightRaw = parsedComparison.right ?? parsedComparison.articleB;
+        const headToHeadRaw = parsedComparison.headToHead;
         setComparison({
           left: normalizeAnalysisResponse(leftRaw),
           right: normalizeAnalysisResponse(rightRaw),
+          headToHead: headToHeadRaw as HeadToHeadResponse | undefined,
         });
+        if (headToHeadRaw && typeof headToHeadRaw === "object") {
+          setHeadToHead(headToHeadRaw as HeadToHeadResponse);
+        }
         setLoading(false);
         return;
       }
@@ -323,6 +329,7 @@ function ResultsPageContent() {
 
   useEffect(() => {
     if (!compareMode || !comparison) return;
+    if (comparison.headToHead) return;
 
     let isCancelled = false;
     const runHeadToHead = async () => {
