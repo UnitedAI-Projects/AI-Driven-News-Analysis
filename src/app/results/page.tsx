@@ -62,6 +62,15 @@ type ComparisonResponse = {
   right: AnalysisResponse;
 };
 
+type HeadToHeadResponse = {
+  moreBiasedArticle: "A" | "B" | "Tie";
+  biasDifference: number;
+  toneComparison: string;
+  uniqueFactsA: string[];
+  uniqueFactsB: string[];
+  verdict: string;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -132,6 +141,18 @@ const SEVERITY_COLORS: Record<BiasFlag["severity"], string> = {
   major: "bg-red-50 text-red-700 border-red-200",
 };
 
+const BASE_REFLECTION_QUESTIONS: string[] = [
+  "Who benefits from this framing, and who might be left out?",
+  "What would a headline from the 'other side' look like?",
+  "Which claims are verified with evidence vs. asserted?",
+  "What would you need to read next to form a more complete view?",
+];
+
+const SUMMARY_EMPTY_MESSAGE =
+  "We could not detect much article text to analyze. Try pasting more of the story, or submit a valid article URL.";
+const SUMMARY_FALLBACK_MESSAGE =
+  "We couldn't generate a short summary for this article. The bias analysis and other sections below are still based on the text.";
+
 // Confidence helpers
 function getConfidenceLabel(confidence: number): string {
   if (confidence >= 90) return "Very High";
@@ -177,6 +198,40 @@ function splitSummary(summary: string): { intro: string; bullets: string[] } {
   };
 }
 
+function normalizeAnalysisResponse(raw: unknown): AnalysisResponse {
+  const data = (raw ?? {}) as Partial<AnalysisResponse>;
+  const url = typeof data.url === "string" ? data.url : null;
+  const trimmedSummary = typeof data.summary === "string" ? data.summary.trim() : "";
+  const hasFacts = Array.isArray(data.keyFacts) && data.keyFacts.length > 0;
+
+  let summary = trimmedSummary;
+  if (!summary) {
+    summary = hasFacts ? SUMMARY_FALLBACK_MESSAGE : SUMMARY_EMPTY_MESSAGE;
+    if (url) summary += ` (Source: ${url})`;
+  }
+
+  const parsedKeyFacts =
+    Array.isArray(data.keyFacts) && data.keyFacts.length > 0
+      ? data.keyFacts.map((fact) => stripMarkdown(String(fact))).filter(Boolean)
+      : ["Could not extract key facts."];
+
+  return {
+    summary: stripMarkdown(summary),
+    biasScore: typeof data.biasScore === "number" ? data.biasScore : 75,
+    biasFlagged: Array.isArray(data.biasFlagged) ? data.biasFlagged : [],
+    overallAssessment: typeof data.overallAssessment === "string" ? data.overallAssessment : undefined,
+    dominantBias: data.dominantBias,
+    keyFacts: parsedKeyFacts,
+    reflectionQuestions:
+      Array.isArray(data.reflectionQuestions) && data.reflectionQuestions.length > 0
+        ? data.reflectionQuestions
+        : BASE_REFLECTION_QUESTIONS,
+    difficultWords: Array.isArray(data.difficultWords) ? data.difficultWords : [],
+    articleTitle: typeof data.articleTitle === "string" ? data.articleTitle : null,
+    url,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -191,6 +246,9 @@ function ResultsPageContent() {
   const [showCategoryInfo, setShowCategoryInfo] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
+  const [headToHead, setHeadToHead] = useState<HeadToHeadResponse | null>(null);
+  const [headToHeadLoading, setHeadToHeadLoading] = useState(false);
+  const [headToHeadError, setHeadToHeadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -204,8 +262,11 @@ function ResultsPageContent() {
           setLoading(false);
           return;
         }
-        const parsedComparison = JSON.parse(rawComparison) as ComparisonResponse;
-        setComparison(parsedComparison);
+        const parsedComparison = JSON.parse(rawComparison) as Partial<ComparisonResponse>;
+        setComparison({
+          left: normalizeAnalysisResponse(parsedComparison?.left),
+          right: normalizeAnalysisResponse(parsedComparison?.right),
+        });
         setLoading(false);
         return;
       }
@@ -232,6 +293,51 @@ function ResultsPageContent() {
       setLoading(false);
     }
   }, [compareMode]);
+
+  useEffect(() => {
+    if (!compareMode || !comparison) return;
+
+    let isCancelled = false;
+    const runHeadToHead = async () => {
+      setHeadToHeadLoading(true);
+      setHeadToHeadError(null);
+      try {
+        const response = await fetch("/api/compare", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            articleA: comparison.left,
+            articleB: comparison.right,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to generate head-to-head analysis.");
+        }
+
+        const payload = (await response.json()) as HeadToHeadResponse;
+        if (!isCancelled) {
+          setHeadToHead(payload);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!isCancelled) {
+          setHeadToHeadError("Unable to generate the head-to-head analysis right now.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setHeadToHeadLoading(false);
+        }
+      }
+    };
+
+    runHeadToHead();
+    return () => {
+      isCancelled = true;
+    };
+  }, [compareMode, comparison]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
@@ -274,7 +380,7 @@ function ResultsPageContent() {
           <section className="mt-8 grid gap-6 lg:grid-cols-2">
             {[comparison.left, comparison.right].map((item, index) => {
               const summary = splitSummary(item.summary ?? "");
-              const score = Math.min(100, Math.max(0, item.biasScore ?? 0));
+              const score = Math.min(100, Math.max(0, item.biasScore ?? 75));
               return (
                 <article
                   key={index}
@@ -340,18 +446,16 @@ function ResultsPageContent() {
                     </div>
                   </div>
 
-                  {item.keyFacts?.length > 0 && (
-                    <div className="mt-5">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-deepBlue/70">
-                        Key Facts
-                      </h3>
-                      <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-deepBlue/90">
-                        {item.keyFacts.slice(0, 5).map((fact, factIndex) => (
-                          <li key={factIndex}>{fact}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <div className="mt-5">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-deepBlue/70">
+                      Key Facts
+                    </h3>
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-deepBlue/90">
+                      {item.keyFacts.slice(0, 5).map((fact, factIndex) => (
+                        <li key={factIndex}>{fact}</li>
+                      ))}
+                    </ul>
+                  </div>
 
                   {item.dominantBias && (
                     <div className="mt-5 flex items-center gap-2">
@@ -368,6 +472,69 @@ function ResultsPageContent() {
                 </article>
               );
             })}
+          </section>
+
+          <section className="mt-8 rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-2xl">
+            <h2 className="font-serif text-2xl font-bold text-white">Head to Head Analysis</h2>
+            <p className="mt-2 text-sm text-slate-300">
+              A direct comparison of framing, facts, and tone across both articles.
+            </p>
+
+            {headToHeadLoading && (
+              <p className="mt-4 text-sm text-slate-300">Generating head-to-head comparison...</p>
+            )}
+
+            {headToHeadError && !headToHeadLoading && (
+              <p className="mt-4 rounded-lg border border-red-400/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+                {headToHeadError}
+              </p>
+            )}
+
+            {headToHead && !headToHeadLoading && (
+              <div className="mt-5 space-y-5">
+                <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Bias Difference</h3>
+                  <p className="mt-2 text-base text-white">
+                    {headToHead.moreBiasedArticle === "Tie"
+                      ? "Both articles appear similarly biased overall."
+                      : `Article ${headToHead.moreBiasedArticle} is more biased by about ${headToHead.biasDifference} points.`}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Tone Comparison</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-100">{headToHead.toneComparison}</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+                      Facts Unique to Article A
+                    </h3>
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-100">
+                      {headToHead.uniqueFactsA.map((fact, idx) => (
+                        <li key={idx}>{fact}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+                      Facts Unique to Article B
+                    </h3>
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-100">
+                      {headToHead.uniqueFactsB.map((fact, idx) => (
+                        <li key={idx}>{fact}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-indigo-400/30 bg-indigo-500/10 p-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-200">Overall Verdict</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-indigo-50">{headToHead.verdict}</p>
+                </div>
+              </div>
+            )}
           </section>
 
           <div className="mt-10 text-center">
