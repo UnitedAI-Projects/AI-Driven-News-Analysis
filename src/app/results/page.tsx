@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES - OPTION A (User-Friendly Names)
@@ -289,6 +290,11 @@ function ResultsPageContent() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  const handleExportPdf = () => {
+    if (typeof window === "undefined") return;
+    window.print();
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -436,11 +442,34 @@ function ResultsPageContent() {
   }, [compareMode, comparison]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
+    <div className="mx-auto max-w-4xl px-4 py-12 print:max-w-none print:px-8 print:py-8">
+      <div className="mb-6 hidden items-center justify-between border-b border-slate-200 pb-4 print:flex">
+        <div className="flex items-center gap-3">
+          <Image src="/WWW.png" alt="NewSeries" width={140} height={42} priority />
+          <div>
+            <p className="font-serif text-2xl font-bold text-slate-900">NewSeries</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Article Analysis Report</p>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">{new Date().toLocaleString()}</p>
+      </div>
+
+      {!loading && !error && !compareMode && analysis && (
+        <div className="mb-6 flex justify-end print:hidden">
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            className="rounded-full bg-deepBlue px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-deepBlue/90"
+          >
+            Export as PDF
+          </button>
+        </div>
+      )}
+
       <h1 className="font-serif text-3xl font-bold text-deepBlue">
         {compareMode ? "Comparison Results" : "Analysis Results"}
       </h1>
-      <p className="mt-1 text-deepBlue/70">
+      <p className="mt-1 text-deepBlue/70 print:text-slate-600">
         {compareMode
           ? "Compare how each article is framed side by side."
           : "Explore how this article is framed and where you might look for additional context."}
@@ -647,7 +676,7 @@ function ResultsPageContent() {
       {!loading && !compareMode && analysis && (
         <>
           {/* Summary */}
-          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green">
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 transition hover:shadow-glow-green print:border-slate-200 print:bg-white print:shadow-none">
             <h2 className="font-serif text-xl font-bold text-deepBlue">Summary</h2>
             <div className="mt-4 flex flex-wrap gap-2">
               {[
@@ -710,7 +739,7 @@ function ResultsPageContent() {
           </section>
 
           {/* Key Facts */}
-          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10 print:border-slate-200 print:bg-white print:shadow-none">
             <h2 className="font-serif text-xl font-bold text-deepBlue">
               Key Facts
             </h2>
@@ -722,7 +751,7 @@ function ResultsPageContent() {
           </section>
 
           {/* Bias Meter */}
-          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+          <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10 print:border-slate-200 print:bg-white print:shadow-none">
             <h2 className="font-serif text-xl font-bold text-deepBlue">
               Bias meter
             </h2>
@@ -779,7 +808,7 @@ function ResultsPageContent() {
 
           {/* Bias Detected */}
           {analysis.biasFlagged && analysis.biasFlagged.length > 0 && (
-            <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10">
+            <section className="mt-8 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/90 p-6 shadow-lg shadow-green/10 print:border-slate-200 print:bg-white print:shadow-none">
               <div className="flex items-center gap-2">
                 <h2 className="font-serif text-xl font-bold text-deepBlue">
                   Bias Detected
@@ -787,7 +816,7 @@ function ResultsPageContent() {
                 <button
                   type="button"
                   onClick={() => setShowBiasInfo(!showBiasInfo)}
-                  className="flex h-6 w-6 items-center justify-center rounded-full bg-deepBlue/10 text-deepBlue hover:bg-deepBlue/20 transition"
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-deepBlue/10 text-deepBlue transition hover:bg-deepBlue/20 print:hidden"
                   aria-label="Learn about bias types"
                 >
                   <span className="text-sm font-bold">?</span>
@@ -896,7 +925,7 @@ function ResultsPageContent() {
 
               {/* See More/Less Button */}
               {analysis.biasFlagged.length > 3 && (
-                <div className="mt-4 text-center">
+                <div className="mt-4 text-center print:hidden">
                   <button
                     type="button"
                     onClick={() => setShowAllBias(!showAllBias)}
@@ -910,7 +939,7 @@ function ResultsPageContent() {
           )}
 
           {/* Think About It */}
-          <section className="mt-8 rounded-xl border-2 border-green/40 bg-greenBg/80 p-6 shadow-glow-green">
+          <section className="mt-8 rounded-xl border-2 border-green/40 bg-greenBg/80 p-6 shadow-glow-green print:border-slate-200 print:bg-white print:shadow-none">
             <h2 className="font-serif text-xl font-bold text-deepBlue">
               Think About It
             </h2>
@@ -929,7 +958,7 @@ function ResultsPageContent() {
           </section>
 
           {/* Difficult Words */}
-          <section className="mt-10 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10">
+          <section className="mt-10 rounded-xl border border-green/20 bg-gradient-to-br from-blueLight to-greenBg/80 p-6 shadow-lg shadow-green/10 print:border-slate-200 print:bg-white print:shadow-none print:hidden">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="flex items-center gap-2">
@@ -1046,7 +1075,7 @@ function ResultsPageContent() {
             </div>
           </section>
 
-          <div className="mt-10 text-center">
+          <div className="mt-10 text-center print:hidden">
             <Link
               href="/#analyze"
               className="inline-block rounded-full bg-gradient-to-r from-green to-greenLight px-8 py-4 font-semibold text-white shadow-glow-green transition hover:shadow-glow-green-lg"
