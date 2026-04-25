@@ -104,6 +104,8 @@ function HomePageContent() {
   const [url, setUrl] = useState("");
   const [compareUrlA, setCompareUrlA] = useState("");
   const [compareUrlB, setCompareUrlB] = useState("");
+  const [compareTextA, setCompareTextA] = useState("");
+  const [compareTextB, setCompareTextB] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,9 +177,16 @@ function HomePageContent() {
 
     const trimmedUrlA = compareUrlA.trim();
     const trimmedUrlB = compareUrlB.trim();
+    const trimmedTextA = compareTextA.trim();
+    const trimmedTextB = compareTextB.trim();
 
-    if (!trimmedUrlA || !trimmedUrlB) {
-      setError("Please enter both article URLs to compare.");
+    if (!trimmedUrlA && !trimmedTextA) {
+      setError("Please enter a URL or paste article text for Article A.");
+      return;
+    }
+
+    if (!trimmedUrlB && !trimmedTextB) {
+      setError("Please enter a URL or paste article text for Article B.");
       return;
     }
 
@@ -200,14 +209,22 @@ function HomePageContent() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ url: trimmedUrlA }),
+          body: JSON.stringify({
+            url: trimmedUrlA || undefined,
+            // URL takes priority when both are provided.
+            articleText: trimmedUrlA ? "" : trimmedTextA,
+          }),
         }),
         fetch("/api/analyze", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ url: trimmedUrlB }),
+          body: JSON.stringify({
+            url: trimmedUrlB || undefined,
+            // URL takes priority when both are provided.
+            articleText: trimmedUrlB ? "" : trimmedTextB,
+          }),
         }),
         compareRequest,
       ]);
@@ -368,6 +385,19 @@ function HomePageContent() {
                 />
               </div>
               <div>
+                <label htmlFor="compare-text-a" className="block font-medium text-deepBlue">
+                  Or paste first article text
+                </label>
+                <textarea
+                  id="compare-text-a"
+                  rows={6}
+                  placeholder="Paste the full text for Article A..."
+                  value={compareTextA}
+                  onChange={(e) => setCompareTextA(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-green/30 bg-blueLight/80 px-4 py-3 text-deepBlue placeholder:text-deepBlue/50 focus:border-green focus:outline-none focus:ring-2 focus:ring-green/30"
+                />
+              </div>
+              <div>
                 <label htmlFor="compare-url-b" className="block font-medium text-deepBlue">
                   Second article URL
                 </label>
@@ -377,6 +407,19 @@ function HomePageContent() {
                   placeholder="https://example.com/article-two"
                   value={compareUrlB}
                   onChange={(e) => setCompareUrlB(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-green/30 bg-blueLight/80 px-4 py-3 text-deepBlue placeholder:text-deepBlue/50 focus:border-green focus:outline-none focus:ring-2 focus:ring-green/30"
+                />
+              </div>
+              <div>
+                <label htmlFor="compare-text-b" className="block font-medium text-deepBlue">
+                  Or paste second article text
+                </label>
+                <textarea
+                  id="compare-text-b"
+                  rows={6}
+                  placeholder="Paste the full text for Article B..."
+                  value={compareTextB}
+                  onChange={(e) => setCompareTextB(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-green/30 bg-blueLight/80 px-4 py-3 text-deepBlue placeholder:text-deepBlue/50 focus:border-green focus:outline-none focus:ring-2 focus:ring-green/30"
                 />
               </div>
